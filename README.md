@@ -21,6 +21,15 @@ The number in the panel is the **binding** window — the one closest to full, b
 is the one that stops you. Amber at 60 %, red at 85 %, dimmed when nazar-tray is not
 running, and `?` when a window could not be read, which is never a reassuring `0 %`.
 
+## Screenshot
+
+Not in the tree yet, and the sketch above is a drawing rather than a capture. A GNOME panel
+can only be photographed from inside a logged-in session — under Wayland the Shell refuses a
+screenshot to anything that is not a person pressing a key, which is a restriction worth
+having and the reason this section is a note instead of an image.
+[docs/screenshots/README.md](docs/screenshots/README.md) says which two shots to take and
+what to check before committing one.
+
 ## What it is
 
 Four files of hand-written GJS that read one file: `~/.nazar/limits.json`, which
