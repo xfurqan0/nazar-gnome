@@ -188,7 +188,7 @@ rm -rf ~/.local/share/gnome-shell/extensions/nazar-gnome@xfurqan0.github.io
 
 ## 5. What is deliberately not automated
 
-- **No release workflow.** A tag does not build or publish anything here. The zip is 38 KB
+- **No release workflow.** A tag does not build or publish anything here. The zip is 14 KB
   and `make zip` takes a second, so a pipeline would add a place for a release to go wrong
   without saving a minute.
 - **No store submission from CI.** extensions.gnome.org has an upload form and a human on
