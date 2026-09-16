@@ -105,3 +105,8 @@ Two routes, and they are not exclusive:
    human review with no promised turnaround. Submitting is a public act: the account, the
    description, the screenshot and the review correspondence are all outward-facing, and
    the text goes past the maintainer before it is sent.
+
+Both are written out step by step in [RELEASE.md](RELEASE.md), including the two version
+numbers that are easy to confuse — the tag, which is ours, and the whole number the store
+assigns on every upload — and a rule-by-rule reading of what the review looks for against
+what is actually in this repository.
