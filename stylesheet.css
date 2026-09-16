@@ -1,0 +1,109 @@
+/* One stylesheet, and it works in a light session for a reason worth writing down.
+ *
+ * The temptation in a Shell extension is to paint everything -- a background, a foreground,
+ * a grey for the dim rows -- and the result is an extension that is legible in whichever
+ * theme its author happened to run. So nothing here paints normal text or any background
+ * behind it: ordinary labels inherit the panel's and the menu's own colour, whatever the
+ * session decided that is, and "dimmed" is opacity rather than a grey that only works
+ * against black.
+ *
+ * The only colours are the three accents, and they are Adwaita's own -- the yellow and red
+ * GNOME itself uses for warnings and errors in both light and dark, plus its blue for a
+ * bar that is merely filling up. A reading is never told apart by colour alone: the number
+ * is beside it and the bar is under it.
+ *
+ * Two class namespaces, never mixed: `nazar-fill-*` paints a bar and `nazar-text-*` paints
+ * a number. One list of severity names on two kinds of widget is how a panel button ends
+ * up with a blue background.
+ */
+
+.nazar-panel {
+  spacing: 4px;
+}
+
+.nazar-icon {
+  icon-size: 16px;
+}
+
+.nazar-value {
+  font-feature-settings: "tnum";
+}
+
+/* The tray is not running. The number is real and no longer maintained, so the indicator
+ * is dimmed rather than recoloured: recolouring would say something about the quota. */
+.nazar-stale {
+  opacity: 0.55;
+}
+
+/* Nothing could be read -- not "nothing has been used". The bead dims with the `?`. */
+.nazar-state-unknown .nazar-icon {
+  opacity: 0.55;
+}
+
+.nazar-provider {
+  font-weight: bold;
+  min-width: 90px;
+}
+
+.nazar-window {
+  min-width: 118px;
+}
+
+.nazar-percent {
+  min-width: 52px;
+  text-align: right;
+  font-feature-settings: "tnum";
+}
+
+.nazar-detail {
+  font-size: 0.9em;
+  opacity: 0.7;
+  padding-left: 12px;
+}
+
+.nazar-note {
+  font-size: 0.9em;
+  opacity: 0.7;
+}
+
+.nazar-alert {
+  font-size: 0.9em;
+  color: #e5a50a;
+}
+
+/* The track is a translucent grey rather than a named one, so it sits on a light menu and
+ * a dark one without being told which it is on. */
+.nazar-bar {
+  width: 96px;
+  height: 6px;
+  border-radius: 3px;
+  background-color: rgba(127, 127, 127, 0.3);
+  margin: 0 8px;
+}
+
+.nazar-bar-fill {
+  height: 6px;
+  border-radius: 3px;
+}
+
+.nazar-fill-ok {
+  background-color: #3584e4;
+}
+
+.nazar-fill-warn {
+  background-color: #e5a50a;
+}
+
+.nazar-fill-critical,
+.nazar-fill-exhausted {
+  background-color: #e01b24;
+}
+
+.nazar-text-warn {
+  color: #e5a50a;
+}
+
+.nazar-text-critical,
+.nazar-text-exhausted {
+  color: #e01b24;
+}

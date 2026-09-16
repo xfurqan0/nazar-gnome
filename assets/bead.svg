@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="32" height="32" shape-rendering="crispEdges" role="img" aria-label="Nazar bead">
+  <title>Nazar bead</title>
+  <!--
+    The mark, on the 16x16 grid nazar-tray draws it at. Every cell is a whole unit, so at
+    16 px each rect lands on exactly one device pixel and nothing is resampled.
+
+    Copied cell for cell from nazar-tray's ui/assets/bead.svg (MIT, same author). Rim
+    #0E2A5A, band #FFFFFF, iris #F2A93B and pupil #0A0A0F are the brand definition shared
+    with nazar-tray and Nazar and must not drift: the icon in this panel and the icon in a
+    Windows tray are one mark, not two drawings of it.
+
+    The bead carries no state. A window at 3 % and a window at 97 % look the same here,
+    because the number beside it is the thing that changed; the only thing the stylesheet
+    does to the icon is dim it when nothing could be read.
+  -->
+  <rect x="6" y="0" width="4" height="1" fill="#0E2A5A"/>
+  <rect x="4" y="1" width="8" height="1" fill="#0E2A5A"/>
+  <rect x="2" y="2" width="4" height="1" fill="#0E2A5A"/>
+  <rect x="6" y="2" width="4" height="1" fill="#FFFFFF"/>
+  <rect x="10" y="2" width="4" height="1" fill="#0E2A5A"/>
+  <rect x="2" y="3" width="2" height="1" fill="#0E2A5A"/>
+  <rect x="4" y="3" width="8" height="1" fill="#FFFFFF"/>
+  <rect x="12" y="3" width="2" height="1" fill="#0E2A5A"/>
+  <rect x="1" y="4" width="2" height="1" fill="#0E2A5A"/>
+  <rect x="3" y="4" width="4" height="1" fill="#FFFFFF"/>
+  <rect x="7" y="4" width="2" height="1" fill="#F2A93B"/>
+  <rect x="9" y="4" width="4" height="1" fill="#FFFFFF"/>
+  <rect x="13" y="4" width="2" height="1" fill="#0E2A5A"/>
+  <rect x="1" y="5" width="2" height="1" fill="#0E2A5A"/>
+  <rect x="3" y="5" width="2" height="1" fill="#FFFFFF"/>
+  <rect x="5" y="5" width="6" height="1" fill="#F2A93B"/>
+  <rect x="11" y="5" width="2" height="1" fill="#FFFFFF"/>
+  <rect x="13" y="5" width="2" height="1" fill="#0E2A5A"/>
+  <rect x="0" y="6" width="2" height="1" fill="#0E2A5A"/>
+  <rect x="2" y="6" width="3" height="1" fill="#FFFFFF"/>
+  <rect x="5" y="6" width="6" height="1" fill="#F2A93B"/>
+  <rect x="11" y="6" width="3" height="1" fill="#FFFFFF"/>
+  <rect x="14" y="6" width="2" height="1" fill="#0E2A5A"/>
+  <rect x="0" y="7" width="2" height="1" fill="#0E2A5A"/>
+  <rect x="2" y="7" width="2" height="1" fill="#FFFFFF"/>
+  <rect x="4" y="7" width="3" height="1" fill="#F2A93B"/>
+  <rect x="7" y="7" width="2" height="1" fill="#0A0A0F"/>
+  <rect x="9" y="7" width="3" height="1" fill="#F2A93B"/>
+  <rect x="12" y="7" width="2" height="1" fill="#FFFFFF"/>
+  <rect x="14" y="7" width="2" height="1" fill="#0E2A5A"/>
+  <rect x="0" y="8" width="2" height="1" fill="#0E2A5A"/>
+  <rect x="2" y="8" width="2" height="1" fill="#FFFFFF"/>
+  <rect x="4" y="8" width="3" height="1" fill="#F2A93B"/>
+  <rect x="7" y="8" width="2" height="1" fill="#0A0A0F"/>
+  <rect x="9" y="8" width="3" height="1" fill="#F2A93B"/>
+  <rect x="12" y="8" width="2" height="1" fill="#FFFFFF"/>
+  <rect x="14" y="8" width="2" height="1" fill="#0E2A5A"/>
+  <rect x="0" y="9" width="2" height="1" fill="#0E2A5A"/>
+  <rect x="2" y="9" width="3" height="1" fill="#FFFFFF"/>
+  <rect x="5" y="9" width="6" height="1" fill="#F2A93B"/>
+  <rect x="11" y="9" width="3" height="1" fill="#FFFFFF"/>
+  <rect x="14" y="9" width="2" height="1" fill="#0E2A5A"/>
+  <rect x="1" y="10" width="2" height="1" fill="#0E2A5A"/>
+  <rect x="3" y="10" width="2" height="1" fill="#FFFFFF"/>
+  <rect x="5" y="10" width="6" height="1" fill="#F2A93B"/>
+  <rect x="11" y="10" width="2" height="1" fill="#FFFFFF"/>
+  <rect x="13" y="10" width="2" height="1" fill="#0E2A5A"/>
+  <rect x="1" y="11" width="2" height="1" fill="#0E2A5A"/>
+  <rect x="3" y="11" width="4" height="1" fill="#FFFFFF"/>
+  <rect x="7" y="11" width="2" height="1" fill="#F2A93B"/>
+  <rect x="9" y="11" width="4" height="1" fill="#FFFFFF"/>
+  <rect x="13" y="11" width="2" height="1" fill="#0E2A5A"/>
+  <rect x="2" y="12" width="2" height="1" fill="#0E2A5A"/>
+  <rect x="4" y="12" width="8" height="1" fill="#FFFFFF"/>
+  <rect x="12" y="12" width="2" height="1" fill="#0E2A5A"/>
+  <rect x="2" y="13" width="4" height="1" fill="#0E2A5A"/>
+  <rect x="6" y="13" width="4" height="1" fill="#FFFFFF"/>
+  <rect x="10" y="13" width="4" height="1" fill="#0E2A5A"/>
+  <rect x="4" y="14" width="8" height="1" fill="#0E2A5A"/>
+  <rect x="6" y="15" width="4" height="1" fill="#0E2A5A"/>
+</svg>
