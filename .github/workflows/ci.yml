@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DEBIAN_FRONTEND: noninteractive
+  # Pinned rather than floating: a lint run that changes its mind between two pushes of the
+  # same file is a lint run nobody reads. Raising it is a commit like any other.
+  ESLINT_VERSION: 10.10.0
+  UUID: nazar-gnome@xfurqan0.github.io
+
+jobs:
+  check:
+    name: Tests, lint and package
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # `gjs` is what the tests run under and it is a small package. `gnome-shell` is here
+      # for one binary — `/usr/bin/gnome-extensions`, which is what `make zip` packs with —
+      # and it is worth its size: a package built by a different tool than the one the
+      # maintainer uses is a package nobody has actually checked. No session, no display and
+      # no D-Bus is needed for either; `pack` reads files and writes a zip.
+      - name: Install gjs and the extension packer
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gjs gnome-shell jq
+          gjs --version
+          gnome-extensions version
+
+      - name: Tests
+        run: make check
+
+      # No `node_modules` and no lock file: this repository is a GNOME extension, not a Node
+      # package, and nothing about it should install a dependency tree. `npx` fetches one
+      # pinned tool into the runner's cache and leaves the tree alone.
+      - name: Lint
+        run: npx --yes "eslint@${ESLINT_VERSION}" .
+
+      - name: Pack
+        run: make zip
+
+      # The half of review that is about what is *in* the file. EGO rejects an upload that
+      # carries a build directory, a node_modules, an editor backup or a compiled anything,
+      # and the packer takes whatever `--extra-source` names — so the list below is the
+      # answer to "what did we just hand somebody", checked here rather than on the store's
+      # queue.
+      - name: The package carries only what an extension is allowed to carry
+        run: |
+          set -euo pipefail
+          zip="${UUID}.shell-extension.zip"
+          unzip -Z1 "$zip" | sort > "${RUNNER_TEMP}/packed.txt"
+          echo "Packed:"
+          sed 's/^/  /' "${RUNNER_TEMP}/packed.txt"
+
+          allowed='^(metadata\.json|extension\.js|stylesheet\.css|lib/|lib/[A-Za-z0-9_.-]+\.js|assets/|assets/[A-Za-z0-9_.-]+\.svg)$'
+          status=0
+          while read -r entry; do
+            if ! [[ "$entry" =~ $allowed ]]; then
+              echo "::error::${entry} is in the package and nothing allows it"
+              status=1
+            fi
+          done < "${RUNNER_TEMP}/packed.txt"
+
+          # The other direction, because a package can also be wrong by being short: an
+          # extension that packs without lib/ or assets/ installs cleanly and comes up
+          # broken, which is the quiet version of this mistake.
+          for required in metadata.json extension.js stylesheet.css lib/contract.js assets/bead.svg; do
+            if ! grep -qx "$required" "${RUNNER_TEMP}/packed.txt"; then
+              echo "::error::${required} is missing from the package"
+              status=1
+            fi
+          done
+
+          # And the document the store reads is the document in the tree, byte for byte.
+          unzip -p "$zip" metadata.json | cmp - metadata.json
+          exit $status
+
+      # The half of review that is about what the file *says*. Every line here is a rule the
+      # store applies to an upload, or a name this repository has to keep spelling the same
+      # way in four places.
+      - name: metadata.json says what the store requires and what we claim
+        run: |
+          set -euo pipefail
+          jq -e . metadata.json > /dev/null
+
+          test "$(jq -r '.uuid' metadata.json)" = "${UUID}"
+          test "$(jq -r '.uuid' metadata.json)" = "$(grep -m1 '^UUID = ' Makefile | cut -d' ' -f3)"
+          test "$(jq -r '.url' metadata.json)" = "https://github.com/${GITHUB_REPOSITORY}"
+
+          # A uuid is a directory name on somebody's machine, so it may not carry a path
+          # separator or a space, and the store matches it against the same shape.
+          jq -e '.uuid | test("^[A-Za-z0-9_.@-]+$")' metadata.json > /dev/null
+
+          jq -e '.name | type == "string" and length > 0' metadata.json > /dev/null
+
+          # The description is the listing on extensions.gnome.org, where a long one is
+          # truncated rather than wrapped.
+          jq -e '.description | type == "string" and length > 0 and length <= 300' metadata.json > /dev/null
+
+          # Every claimed version is a released GNOME Shell major, spelled as a string. A
+          # number here (46 rather than "46") is valid JSON and an invalid metadata.json.
+          jq -e '.["shell-version"] | type == "array" and length > 0
+                 and (map(type == "string" and test("^[0-9]+(\\.[0-9]+)*$")) | all)' metadata.json > /dev/null
+
+          # `settings-schema` and `gettext-domain` would each promise a directory this
+          # extension does not ship. v1 has no preferences and no translations, and the
+          # metadata should not say otherwise.
+          jq -e 'has("settings-schema") | not' metadata.json > /dev/null
+          jq -e 'has("gettext-domain") | not' metadata.json > /dev/null
+
+      - name: Upload the package
+        uses: actions/upload-artifact@v4
+        with:
+          name: nazar-gnome-shell-extension-zip
+          path: ${{ env.UUID }}.shell-extension.zip
+          if-no-files-found: error
