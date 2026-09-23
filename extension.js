@@ -225,17 +225,25 @@ export default class NazarExtension extends Extension {
             return;
 
         const now = Date.now();
-        const reading = Contract.panelReading(this._doc);
         const tray = Contract.trayStatus(this._lockText, {now, pidAlive: pid => pidAlive(pid)});
+        const reading = Contract.panelReading(this._doc, {now, running: tray.running});
 
         // Rule 2 in the one place everybody looks: a question mark, never a reassuring 0 %.
         this._label.text = reading.percent === null ? '?' : `${reading.percent}%`;
 
         this._label.style_class = `nazar-value${textClass(reading.severity)}`;
 
-        // The number stays when the tray stops — it was true when it was written, and
-        // quota does not burn while nothing is using it — but the whole indicator dims, so
-        // that "nobody is maintaining this" is visible without opening the menu.
+        // The number stays when the tray stops, and only for as long as it can still be
+        // true. Quota does not burn while nothing is using it, so a reading taken before the
+        // engine died is a reading that is still good — right up to the window's own reset,
+        // after which it is a number about a window that no longer exists. Past that point
+        // `panelReading` hands back nothing and the panel shows `?`, because the old number
+        // is not merely stale: it is the wrong answer in the reassuring direction, which is
+        // the worst kind. A panel that sat on 67 % for four days after its weekly reset —
+        // while the true figure was 5 % — is the whole reason that rule is in the contract.
+        //
+        // The dimming below is what says "nobody is maintaining this" without opening the
+        // menu, and it is deliberately not the only signal: see the marker on the value.
         const classes = ['nazar-panel'];
         if (reading.severity === 'unknown')
             classes.push('nazar-state-unknown');
@@ -258,7 +266,11 @@ export default class NazarExtension extends Extension {
         menu.removeAll();
 
         const now = Date.now();
-        const views = Contract.providerViews(this._doc, {now});
+        // Read before the rows rather than after them: whether the tray is running decides
+        // whether a window whose reset has passed still counts, so the rows cannot be worded
+        // without it.
+        const tray = Contract.trayStatus(this._lockText, {now, pidAlive: pid => pidAlive(pid)});
+        const views = Contract.providerViews(this._doc, {now, running: tray.running});
 
         if (this._error)
             menu.addMenuItem(infoItem(this._error, 'nazar-note'));
@@ -275,7 +287,6 @@ export default class NazarExtension extends Extension {
 
         menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        const tray = Contract.trayStatus(this._lockText, {now, pidAlive: pid => pidAlive(pid)});
         menu.addMenuItem(infoItem(Contract.trayLine(tray), tray.running ? 'nazar-note' : 'nazar-alert'));
         if (!tray.running)
             menu.addMenuItem(infoItem('start nazar-tray --headless', 'nazar-note'));

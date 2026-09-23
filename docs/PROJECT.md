@@ -32,6 +32,13 @@ in nazar-tray. The rules this extension is built on, in the order they matter:
    hard-coded: `windowMinutes` names a window, the object is iterated, and a provider a
    newer tray adds appears without a release here.
 5. **Times are UTC in the file and local on screen.**
+6. **A reading expires with the window it measured.** Ours rather than the contract's, and a
+   consequence of rule 3: a percentage is a measurement of a window, so when that window is
+   over the number is history. Either the tray says so — `state: "stale"` — or the window's
+   `resetsAt` is behind the clock with no tray running to correct it; in both cases the panel
+   shows `?`. A reset that has just passed with the tray **up** is left alone, because it
+   re-reads within the minute and Claude's five-hour window renews from the first request of
+   a session rather than on the clock. `panelReading` is the whole of this.
 
 `lib/contract.js` is the whole of that, and it imports nothing — not `gi://`, not the Shell
 — so `tests/run.js` can check every rule under plain `gjs -m`.

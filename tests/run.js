@@ -279,6 +279,118 @@ test('a reset is shown in local time with a countdown, and a due one does not co
     match(view.windows[0].detail, /^reset was due 19:00$/);
 });
 
+// --- A reading expires with the window it measured --------------------------------------
+
+test('a dead tray and a reset that has passed is a question mark, not the old number', () => {
+    // The incident this rule comes from, in one case: the engine stops, the binding window's
+    // reset goes by, and nothing is left to correct the number. 70 % was true; it is now a
+    // fact about a week that is over, and a panel that keeps drawing it is telling somebody
+    // about to start a long task that they have 30 % left when nobody knows what they have.
+    const doc = variant(d => {
+        d.providers.codex.windows.secondary.resetsAt = '2026-09-06T09:00:00Z';
+    });
+    const reading = panelReading(doc, {now: NOW, running: false});
+    equal(reading.percent, null, 'no number, rather than a number about a window that ended');
+    equal(reading.severity, 'unknown');
+    equal(reading.provider, 'codex', 'the refused window is still named, so the menu can explain');
+    equal(reading.key, 'secondary');
+    match(reading.reason, /tray not running/);
+
+    // And the row says why, appended to the reset it already reported.
+    const row = providerViews(doc, {now: NOW, timeZone: UTC, running: false})
+        .find(v => v.name === 'codex').windows.find(w => w.key === 'secondary');
+    equal(row.detail, 'reset was due 09:00 · tray not running', 'same day, so no date — and then the cause');
+    equal(row.percentText, '70 %', 'the menu is where you find out what the ? was hiding');
+    equal(row.panelRefused, true);
+});
+
+test('a dead tray with the reset still ahead keeps its number', () => {
+    // The other half of the same rule, and the reason it is not "dim everything": quota does
+    // not burn while nothing is using it, so a reading taken before the engine died is still
+    // the truth about this window until the window itself ends.
+    const reading = panelReading(SAMPLE, {now: NOW, running: false});
+    equal(reading.percent, 70);
+    equal(reading.reason, null);
+
+    const row = providerViews(SAMPLE, {now: NOW, timeZone: UTC, running: false})
+        .find(v => v.name === 'codex').windows.find(w => w.key === 'secondary');
+    equal(row.panelRefused, false);
+    match(row.detail, /^resets /, 'nothing appended to a window that has not ended');
+});
+
+test('a running tray is trusted through a reset that has just passed', () => {
+    // A live engine re-reads within the minute, and Claude's five-hour window renews from
+    // the first request of a new session rather than on the clock — so a reset that has just
+    // gone by with the tray up is a reading about to be replaced, not a wrong one. Blanking
+    // it would put a `?` in the panel every time a window turned over.
+    const doc = variant(d => {
+        d.providers.codex.windows.secondary.resetsAt = '2026-09-06T09:00:00Z';
+    });
+    equal(panelReading(doc, {now: NOW, running: true}).percent, 70);
+    equal(panelReading(doc, {now: NOW, running: true}).reason, null);
+});
+
+test('cannot tell is not a dead tray, and does not blank a real number', () => {
+    // The contract's rule about the lock, applied to the reading: "cannot tell" is never
+    // "nobody is there". A machine whose `/proc` could not be read would otherwise have its
+    // percentage taken away on the strength of an outage nobody observed.
+    const doc = variant(d => {
+        d.providers.codex.windows.secondary.resetsAt = '2026-09-06T09:00:00Z';
+    });
+    equal(panelReading(doc, {now: NOW, running: null}).percent, 70);
+    equal(panelReading(doc, {now: NOW}).percent, 70, 'and the same with no answer given at all');
+});
+
+test('a stale binding window is a question mark whether the tray is up or not', () => {
+    // `stale` is the tray saying the thing itself: the reset passed and nothing has been
+    // read since. A face that draws the number anyway is contradicting the only program in
+    // the system that knows, which is not a judgement call.
+    const doc = variant(d => {
+        d.providers.codex.windows.secondary.state = 'stale';
+    });
+    for (const running of [true, false, null]) {
+        const reading = panelReading(doc, {now: NOW, running});
+        equal(reading.percent, null, `stale, tray running: ${JSON.stringify(running)}`);
+        equal(reading.severity, 'unknown');
+        match(reading.reason, /stale/);
+    }
+
+    // The row's own `· stale` marker already carries it; the cause is not appended twice.
+    const row = providerViews(doc, {now: NOW, timeZone: UTC, running: false})
+        .find(v => v.name === 'codex').windows.find(w => w.key === 'secondary');
+    equal(row.stale, true);
+    match(row.detail, /^resets 11 Sept 09:00 · in 4 d 11 h$/);
+});
+
+test('the incident, in the shape the file actually had', () => {
+    // 17 September: nazar-tray stopped. 19 September: the weekly window it had last measured
+    // reset. 23 September: the panel was still showing 67 % of a week that had been over for
+    // four days, the menu said "reset was due" underneath it, and the real figure was 5 %.
+    // Nothing in the old rule was wrong about any single field; the number was simply about
+    // a window that no longer existed.
+    const doc = variant(d => {
+        d.updatedAt = '2026-09-17T12:00:00Z';
+        d.providers.claude.sourceAt = '2026-09-17T12:00:00Z';
+        d.providers.claude.windows.seven_day.percent = 67;
+        d.providers.claude.windows.seven_day.resetsAt = '2026-09-19T02:00:00Z';
+        delete d.providers.claude.windows.seven_day_fable;
+        d.providers.codex = {configured: false};
+    });
+    const then = Date.parse('2026-09-23T10:00:00Z');
+
+    equal(panelReading(doc, {now: then, running: true}).percent, 67, 'with an engine up it is a live reading');
+
+    const reading = panelReading(doc, {now: then, running: false});
+    equal(reading.percent, null);
+    equal(reading.severity, 'unknown');
+    equal(reading.provider, 'claude');
+    equal(reading.key, 'seven_day');
+
+    const row = providerViews(doc, {now: then, timeZone: UTC, running: false})
+        .find(v => v.name === 'claude').windows.find(w => w.key === 'seven_day');
+    equal(row.detail, 'reset was due 19 Sept 02:00 · tray not running');
+});
+
 test('a stale window keeps its number and loses the claim that it is current', () => {
     const doc = variant(d => {
         d.providers.codex.windows.secondary.state = 'stale';

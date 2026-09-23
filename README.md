@@ -91,9 +91,22 @@ statement of that is here rather than nowhere.
 | | |
 |---|---|
 | `70%` | The binding window, rounded **down**. 99.6 % is `99%`, because a panel that says a window is spent when it is not is wrong at the moment it matters most. |
-| `?` | Nothing could be read. Not "nothing has been used" — the two are opposite messages to somebody about to start a long task. |
+| `?` | Nothing could be read, **or the reading has outlived its window** — see below. Not "nothing has been used": the two are opposite messages to somebody about to start a long task. |
 | amber, red | 60 % and 85 %, the thresholds nazar-tray itself warns at. |
-| dimmed | nazar-tray is not running. The number stays, because it was true when it was written and quota does not burn while nothing is using it. |
+| dimmed | nazar-tray is not running. The number stays while it can still be true — quota does not burn while nothing is using it — and the whole indicator dims. |
+
+A reading expires with the window it measured. If the binding window's reset has passed and
+nazar-tray is **not** running, there is nothing left to correct the number and the panel
+shows `?` rather than a percentage of a week that is over; the menu row says
+`reset was due 02:00 Sat · tray not running`. The same applies the moment the tray marks a
+window `stale`, which is that program saying it itself. While the tray *is* running a reset
+that has just gone by is left alone, because the tray re-reads within the minute and Claude
+Code's five-hour window renews from the first request of a new session rather than on the
+clock.
+
+This is not a small distinction. A panel showing a real number from a dead engine is wrong
+in the reassuring direction, which is the expensive one: 67 % of a weekly window that had
+reset four days earlier reads as "a third left", and the machine was at 5 %.
 
 The menu lists every window both providers report, shortest first, with `◂` on the one that
 binds. Window names come from `windowMinutes` rather than from a list of keys, so a window
