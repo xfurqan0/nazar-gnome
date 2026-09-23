@@ -125,15 +125,17 @@ The text the store will show, which is `metadata.json` verbatim:
 ```
 Name:        Nazar
 Description: Claude Code and Codex quota in the GNOME panel. Reads the limits.json that
-             nazar-tray writes: no network, no subprocess, no file of its own.
+             nazar-tray writes: no network, no file of its own, and the only thing it
+             starts is the tray's own settings page, from the menu.
 URL:         https://github.com/xfurqan0/nazar-gnome
 UUID:        nazar-gnome@xfurqan0.github.io
 Shell:       46, 47, 48, 49, 50
 ```
 
-140 characters of description, against a listing that truncates a long one rather than
+Under 300 characters of description, against a listing that truncates a long one rather than
 wrapping it. Both sentences survive the truncation point; the second is the one that answers
-the question a reviewer of a quota extension asks first.
+the question a reviewer of a quota extension asks first, and it names the single command the
+extension can launch rather than claiming there is none.
 
 ### 3.3 What the review is looking for, and where this extension stands
 
@@ -144,7 +146,7 @@ paragraph of reassurance.
 | The rule | Here |
 |---|---|
 | No binaries, no compiled blobs, readable unminified source | Four hand-written files: `extension.js`, `lib/contract.js`, `stylesheet.css`, `assets/bead.svg`. The CI package check fails on anything else. |
-| No subprocesses, no privilege elevation | Nothing is elevated and nothing is started on a tick, on a timer or while the panel draws. `tests/run.js` greps the sources for `Gio.Subprocess`, `GLib.spawn`, `spawn_command_line` and thirteen more names, and fails if any appears. |
+| No subprocesses, no privilege elevation | Nothing is elevated and nothing is started on a tick, on a timer or while the panel draws. `tests/run.js` greps the sources for `Gio.Subprocess`, `GLib.spawn`, `spawn_command_line` and thirteen more names, and fails if any appears. One command can be launched — `nazar-tray --view settings`, the tray's own settings page — through an app info and the session's launch context, from the `activate` handler of a menu row a person clicked; a second test counts the launches and the call sites and fails if either grows. |
 | No network | No `Soup`, no `fetch`, no socket; same grep. Everything on screen came out of a file another program wrote. |
 | `disable()` must undo everything `enable()` did | Sources removed, monitor cancelled and disconnected, cancellable cancelled, button destroyed, fields dropped. A test reads both method bodies and fails if `enable()` sets a field `disable()` does not release; a nested session ran ten disable/enable cycles and ended with one panel button and no JS errors. |
 | No blocking I/O on the main loop | `load_contents_async` with a `Gio.Cancellable`, never the synchronous call. |

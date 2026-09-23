@@ -14,6 +14,7 @@ Codex                      plus · rollout log · read 1 m ago
   week ◂       ▓▓▓▓▓▓▓░░░    70 %   resets 11 Sept 12:00 · in 4 d 3 h
   ─────────────────────────────────────────────────────────────
   nazar-tray is running (pid 162640, beating < 1 m ago)
+  ⚙ Settings…
 ```
 
 The number in the panel is the **binding** window — the one closest to full, because that
@@ -42,7 +43,12 @@ the same document.
 What it therefore never does:
 
 - **No network.** Not a request, not a socket, not a library that could make one.
-- **No subprocess.** It does not run `nazar-tray`, or any other program.
+- **Nothing started on its own.** No program runs on a tick, on a timer, when the panel is
+  drawn or when the extension is enabled. The one command it can ever launch is
+  `nazar-tray --view settings`, when a person clicks the gear at the foot of the menu — the
+  tray's own settings page, because the thresholds this panel draws belong to the tray and
+  a second place to set them would be one place too many. If `nazar-tray` is not on the
+  path the row is still there, dimmed, saying so.
 - **No credentials.** `limits.json` carries none by contract, and nothing else is opened.
 - **No writing.** Not a cache, not a "last good value", not a lock. `~/.nazar` has one
   writer and this is not it.
@@ -120,7 +126,8 @@ left exactly one panel button and no JS errors, and `disable()` left nothing beh
 ## What it is not
 
 It is not a settings page, a notifier, or a second copy of the tray's panel. There are no
-preferences in v1 and no translations; there are no notifications, because nazar-tray
+preferences in v1 and no translations — the gear opens the tray's settings, it does not
+reimplement them; there are no notifications, because nazar-tray
 already sends those and a second source would double every warning. `usage/YYYY-MM.json` —
 the usage history — is deliberately not read: a month of hourly token counts is a usage
 profile, and the contract that describes it says no other program reads it.

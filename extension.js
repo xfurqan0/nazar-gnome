@@ -2,9 +2,14 @@
 // lib/contract.js worked out. There is no arithmetic in this file on purpose — every
 // number and every string it draws comes from there, where a test can reach it.
 //
-// What this extension does not do is most of what it is: it opens no socket, runs no
-// program, spawns no subprocess, ships no binary and writes no file, anywhere. It reads
-// two small files in `~/.nazar` that nazar-tray already writes, and draws them.
+// What this extension does not do is most of what it is: it opens no socket, ships no
+// binary and writes no file, anywhere. It reads two small files in `~/.nazar` that
+// nazar-tray already writes, and draws them.
+//
+// It starts nothing by itself — not on a tick, not on a timer, not while the panel is being
+// drawn. The single exception is the gear at the foot of the menu, which launches
+// nazar-tray's own settings page when a person clicks it, and that is the whole of it: one
+// command, one call site, reached only from an `activate` handler, checked by a test.
 
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
@@ -17,6 +22,18 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 import * as Contract from './lib/contract.js';
+
+/**
+ * The tray's own settings page, and the only command this extension ever launches.
+ *
+ * `--view settings` is nazar-tray's documented way in (`crates/nazar-tray/src/cli.rs`): it
+ * opens the tray's panel on its settings page, which is where every threshold this face
+ * draws is actually configured. The extension has no preferences of its own on purpose —
+ * two places to set one threshold is one place too many — so the gear is a door to the
+ * program that owns them rather than a second copy of them.
+ */
+const TRAY_PROGRAM = 'nazar-tray';
+const TRAY_SETTINGS_COMMAND = `${TRAY_PROGRAM} --view settings`;
 
 /** Countdowns and ages move with the clock, so the panel is redrawn on a slow tick. */
 const TICK_SECONDS = 30;
@@ -262,6 +279,26 @@ export default class NazarExtension extends Extension {
         menu.addMenuItem(infoItem(Contract.trayLine(tray), tray.running ? 'nazar-note' : 'nazar-alert'));
         if (!tray.running)
             menu.addMenuItem(infoItem('start nazar-tray --headless', 'nazar-note'));
+
+        // `emblem-system-symbolic` rather than `preferences-system-symbolic`: in
+        // adwaita-icon-theme 50 the first is still the cog — the shape a person reads as
+        // "settings" at 16 px in a Shell menu — while the second was redrawn as a
+        // screwdriver over a diagonal, which at that size is a smudge and at any size is
+        // not what the rest of GNOME puts on a settings row. It lives under
+        // `symbolic/legacy/` in the theme and is shipped there in every version this
+        // extension claims, so the name is safe to hard-code.
+        const settings = new PopupMenu.PopupImageMenuItem('Settings…', 'emblem-system-symbolic');
+        // Looked up when the menu is built rather than once in enable(): a tray installed
+        // while the session is up should light the row up without a logout, and this is a
+        // path lookup, not a launch.
+        const installed = GLib.find_program_in_path(TRAY_PROGRAM) !== null;
+        if (installed)
+            settings.connect('activate', () => this._openTraySettings());
+        else
+            settings.setSensitive(false);
+        menu.addMenuItem(settings);
+        if (!installed)
+            menu.addMenuItem(infoItem(`${TRAY_PROGRAM} is not installed`, 'nazar-note'));
     }
 
     _providerItem(view) {
@@ -307,6 +344,26 @@ export default class NazarExtension extends Extension {
             x_align: Clutter.ActorAlign.END,
         }));
         return item;
+    }
+
+    /**
+     * Open nazar-tray's settings page. The one thing in this extension that starts a
+     * program, and it starts it only because somebody clicked the gear.
+     *
+     * An app-info launch rather than a child process of our own, which is the whole
+     * difference: the command is handed to GIO, which starts it under the session's launch
+     * context — the same machinery a `.desktop` file goes through — so the Shell is not its
+     * parent, its output is not ours to read, and it does not die when the extension is
+     * disabled. A face that held a child would have to reap it, and reaping a child in
+     * `disable()` is how an extension leaks a process across a lock screen.
+     */
+    _openTraySettings() {
+        try {
+            Gio.AppInfo.create_from_commandline(TRAY_SETTINGS_COMMAND, null, Gio.AppInfoCreateFlags.NONE)
+                .launch([], global.create_app_launch_context(0, -1));
+        } catch (error) {
+            this._warnOnce(`could not start ${TRAY_SETTINGS_COMMAND}: ${error.message}`);
+        }
     }
 
     /** One line per distinct problem. A log line every tick is a rejected extension. */

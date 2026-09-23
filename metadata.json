@@ -1,7 +1,7 @@
 {
   "uuid": "nazar-gnome@xfurqan0.github.io",
   "name": "Nazar",
-  "description": "Claude Code and Codex quota in the GNOME panel. Reads the limits.json that nazar-tray writes: no network, no subprocess, no file of its own.",
+  "description": "Claude Code and Codex quota in the GNOME panel. Reads the limits.json that nazar-tray writes: no network, no file of its own, and the only thing it starts is the tray's own settings page, from the menu.",
   "shell-version": ["46", "47", "48", "49", "50"],
   "url": "https://github.com/xfurqan0/nazar-gnome"
 }

@@ -40,7 +40,7 @@ in nazar-tray. The rules this extension is built on, in the order they matter:
 
 | Not here | Why |
 |---|---|
-| Preferences (`prefs.js`, a gschema) | Nothing to configure yet. The thresholds are nazar-tray's, so that every face answers the same question the same way. |
+| Preferences (`prefs.js`, a gschema) | Nothing to configure here. The thresholds are nazar-tray's, so that every face answers the same question the same way, and the gear at the foot of the menu opens the tray's own settings page (`nazar-tray --view settings`) rather than a second set of them. |
 | Translations | English only. A locale layer is worth adding once the strings stop moving. |
 | Notifications | nazar-tray already sends them. A second source doubles every warning. |
 | A refresh button | The tray writes the file and the monitor notices; a refresh would mean either a subprocess or a file this extension is not allowed to write. `tray.request` is an *internal* format in nazar-tray, not part of the consumer contract, and opening it to consumers is a change in that repository first. |
@@ -68,7 +68,11 @@ now pinned by a test or a comment:
 
 - **No binaries, no privilege elevation, and nothing started on its own.** No binary is
   shipped, nothing is elevated, and nothing at all runs on a tick, on a timer or when the
-  panel is drawn.
+  panel is drawn. One command can be launched, `nazar-tray --view settings`, and only from
+  the `activate` handler of the gear a person clicked: it goes to the session through an app
+  info and the session's launch context, the way a `.desktop` entry does, so the Shell never
+  becomes anybody's parent. A test counts the launches in the tree, counts the call sites,
+  and fails if either grows.
 - **`disable()` undoes `enable()`.** Every source removed, the monitor cancelled and
   disconnected, the cancellable cancelled, the button destroyed, every field dropped. A
   test reads both bodies and fails if `enable()` sets a field that `disable()` does not let
@@ -109,3 +113,40 @@ Both are written out step by step in [RELEASE.md](RELEASE.md), including the two
 numbers that are easy to confuse — the tag, which is ours, and the whole number the store
 assigns on every upload — and a rule-by-rule reading of what the review looks for against
 what is actually in this repository.
+
+## Log
+
+Dated notes for the things that were measured rather than reasoned about, newest last.
+
+### 2026-09-23 · what `nazar-tray --view settings` actually does to a running engine
+
+The gear launches the tray's documented settings command, so the question is what that
+command does on the machine this extension is for: a GNOME session with the tray already
+running headless, which is the only configuration the README recommends. Measured against
+the engine that was up at the time (pid 88706, `nazar-tray --headless`, GNOME Shell 50.4,
+Fedora 44 Wayland), with `setsid -f nazar-tray --view settings` and six seconds of watching:
+
+- The launched process **printed `nazar-tray is already running (pid 88706); asked it to
+  show its panel` and exited immediately.** There is never a second `nazar-tray` in the
+  process table; the request is handed to the instance that holds the lock.
+- **The engine survives.** `limits.lock` still carried pid 88706 afterwards and its
+  `heartbeatAt` kept advancing across every attempt (10:03:02 → 10:03:17 → 10:06:32 UTC).
+  Nothing about the gear costs the measurement, which was the thing worth being sure of.
+- **The engine reacts.** Idle, the engine and its WebKit web process burned 0 and 1 clock
+  ticks over six seconds; over the six seconds after the request, 3 and 6. A headless engine
+  still builds its webview at startup — both WebKit helper processes date from the engine's
+  own start — so waking both of them is what showing that window looks like from outside.
+- **Whether a window appeared on screen is not something this was able to confirm.** Under
+  Wayland the Shell refuses a screenshot to anything but a keypress, and both
+  `org.gnome.Shell.Eval` and `org.gnome.Shell.Introspect.GetWindows` answer *not allowed* to
+  an ordinary caller — the same restriction that keeps this repository's screenshots a note
+  instead of a file. The CPU evidence says the panel was drawn; the last step of that is for
+  a person with the session in front of them, and it is on the release checklist.
+
+Two things about nazar-tray 0.2.0 came out of the same hour and belong in **its** tracker
+rather than here: the single-instance path reports only "asked it to show its panel"
+regardless of which `--view` page was requested, so there is no way to tell from the outside
+whether `settings` was honoured; and `nazar-tray --help` does not print a usage message —
+with an instance running it is treated as a request to show the panel, and with none running
+it starts the application. Neither changes what the gear should do: the command is correct
+against the tray's own CLI contract, and it stays.

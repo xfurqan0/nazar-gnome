@@ -353,11 +353,13 @@ test('`~/.nazar` is resolved the way the writer resolves it', () => {
 
 // --- What the Shell half must never contain ---------------------------------------------
 
-test('the extension opens no socket, runs no program and writes no file', () => {
+test('the extension opens no socket, spawns nothing and writes no file', () => {
     // A grep rather than a trace, and it is the right shape of check: what it rules out is
     // a future line that reaches for one of these. This is also the half of the review
     // guidelines that rejects extensions — spawning, elevating, shipping a binary — and the
-    // architecture's whole claim is that we never go near it.
+    // architecture's whole claim is that we never go near it. The one program this
+    // extension launches goes through an app info and the session's own launch context, not
+    // through any name below, and the test under this one is what pins that down.
     const source = [read(`${ROOT}/extension.js`), read(`${ROOT}/lib/contract.js`)].join('\n');
     const forbidden = [
         'Gio.Subprocess', 'GLib.spawn', 'spawn_async', 'spawn_command_line',
@@ -373,6 +375,32 @@ test('the extension opens no socket, runs no program and writes no file', () => 
     ];
     for (const name of forbidden)
         ok(!source.includes(name), `${name} has no business in a face`);
+});
+
+test('the one program it ever starts is the tray\'s own settings page', () => {
+    // The architecture's claim is not "no program ever runs" any more — it is that exactly
+    // one does, by name, once, and only because a person clicked a menu row. That is a
+    // claim about call sites rather than about a string, so it is checked as one: a single
+    // launch in the tree, a single command, and every mention of the method that performs
+    // it is either its own definition or an `activate` handler. A launch that migrated into
+    // the tick, the render or enable() would fail here before anybody ran the Shell.
+    const source = read(`${ROOT}/extension.js`);
+    equal(occurrences(source, 'create_from_commandline'), 1, 'one launch in the whole tree');
+    equal(occurrences(source, '.launch('), 1);
+    ok(source.includes("'nazar-tray --view settings'") || source.includes('--view settings'),
+        'the documented way into the tray\'s settings page');
+
+    for (const line of source.split('\n')) {
+        if (!line.includes('_openTraySettings'))
+            continue;
+        ok(line.includes('_openTraySettings() {') || line.includes("connect('activate'"),
+            `the launch is reached only from a click: ${line.trim()}`);
+    }
+
+    // And the row exists either way, because a menu that silently drops an item on a
+    // machine without the tray teaches the user nothing about why.
+    ok(source.includes('find_program_in_path'), 'a missing tray is dimmed, not hidden');
+    ok(source.includes('setSensitive(false)'));
 });
 
 test('everything enable() creates, disable() releases', () => {
@@ -419,7 +447,8 @@ test('metadata says what it is allowed to say', () => {
     deepEqual(metadata['shell-version'], ['46', '47', '48', '49', '50']);
     equal(metadata.version, undefined, 'the version number belongs to extensions.gnome.org');
     equal(metadata['session-modes'], undefined, 'user-only is the default; saying so is noise');
-    match(metadata.description, /no network, no subprocess/);
+    match(metadata.description, /no network, no file of its own/);
+    ok(metadata.description.length <= 300, 'the store truncates a long listing rather than wrapping it');
 });
 
 test('the sample is nazar-tray\'s own, unedited', () => {
@@ -435,6 +464,10 @@ function read(path) {
     if (!ok_)
         throw new Error(`could not read ${path}`);
     return new TextDecoder().decode(bytes);
+}
+
+function occurrences(text, needle) {
+    return text.split(needle).length - 1;
 }
 
 function between(text, from, to) {
