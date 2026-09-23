@@ -83,6 +83,50 @@ Then log out and back in — a Wayland session cannot load a new extension witho
 gnome-extensions enable nazar-gnome@xfurqan0.github.io
 ```
 
+### And the engine, which is not optional
+
+The extension reads a file; **nazar-tray writes it**. With no engine running there is
+nothing to read, and after a while there is worse than nothing: a file whose windows have
+since reset. So install [nazar-tray](https://github.com/xfurqan0/nazar-tray) and keep it
+running headless.
+
+```sh
+nazar-tray --headless
+```
+
+That is one session. To have it back tomorrow, give the session an autostart entry —
+`~/.config/autostart/nazar-tray.desktop`:
+
+```ini
+[Desktop Entry]
+Type=Application
+Name=nazar-tray engine
+Exec=nazar-tray --headless
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+```
+
+`NoDisplay=true` keeps it out of the applications grid — it draws nothing on GNOME by
+design — and `X-GNOME-Autostart-enabled=true` is what GNOME's own session honours. Check it
+after the next login:
+
+```sh
+pgrep -a nazar-tray                # nazar-tray --headless
+cat ~/.nazar/limits.lock           # a pid, and a heartbeat less than a minute old
+```
+
+**This extension does not write that file for you**, and will not grow a button that does.
+The review guidelines it is built against draw the line at an extension that starts
+programs, and the rule this repository keeps is stricter than the line: nothing runs on a
+tick, on a timer or while the panel is drawn. The single command it can launch is the tray's
+own settings page, and only because somebody clicked the gear. An engine that has to be
+running is a sentence in a README; an extension that quietly starts daemons is a different
+kind of software.
+
+This section exists because of where the four days of stale numbers started: no autostart
+entry, an engine that did not come back after a restart, and a panel that was not emphatic
+enough about it.
+
 Requires GNOME Shell 46 to 50. Only **50** has been run against; 46 to 49 use the same
 ESM API and nothing outside it, but they are claimed rather than tested, and the honest
 statement of that is here rather than nowhere.
@@ -126,16 +170,22 @@ a week-old document beside a fresh heartbeat is a quiet week, not a broken tray.
 make check
 ```
 
-27 tests under plain `gjs -m tests/run.js`: the panel number, the rounding, the unknown
-state, the tie-breaks, the tray's four pulses, a damaged document, a schema version from
-the future, and a source-level check that this extension contains no way to open a socket,
-run a program or write a file. The fixture is nazar-tray's own
-`fixtures/limits.sample.json`, copied as its contract asks consumers to copy it, and every
-case derives its document from that sample rather than committing a second one.
+35 tests under plain `gjs -m tests/run.js`: the panel number, the rounding, the unknown
+state, the expiry rule and each of its five cases, the tie-breaks, the tray's four pulses, a
+damaged document, a schema version from the future, and source-level checks that this
+extension contains no way to open a socket or write a file, that the one program it can
+launch is launched from a click and nowhere else, and that the dead-tray marker is a glyph
+both panel fonts carry. The fixture is nazar-tray's own `fixtures/limits.sample.json`,
+copied as its contract asks consumers to copy it, and every case derives its document from
+that sample rather than committing a second one.
 
-The Shell half was driven through all six states in a nested GNOME 50 session: the panel
+The Shell half was driven through its states in a nested GNOME 50 session: the panel
 followed a renamed `limits.json` in **under a second** each time, ten disable/enable cycles
-left exactly one panel button and no JS errors, and `disable()` left nothing behind.
+left exactly one panel button and no JS errors, and `disable()` left nothing behind. The
+nested session runs with `GSETTINGS_BACKEND=memory` inside `dbus-run-session`, which matters
+more than it sounds: a nested Shell started without that writes its settings to the **live**
+session's dconf, and the first run of this repository's harness switched off twelve of the
+maintainer's extensions by doing exactly that.
 
 ## What it is not
 

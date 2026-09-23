@@ -121,9 +121,49 @@ numbers that are easy to confuse — the tag, which is ours, and the whole numbe
 assigns on every upload — and a rule-by-rule reading of what the review looks for against
 what is actually in this repository.
 
+## Work packages
+
+v1 landed as one piece, so this table starts where the repository began changing for a
+reason it did not think of first.
+
+| WP | What | Acceptance | State |
+|---|---|---|---|
+| G-WP1 | Drop the "Open Nazar canvas" menu item | No menu row, no loopback URL, no call that leaves the process for one; the source check fails if either name comes back | landed 2026-09-23 |
+| G-WP2 | A gear that opens nazar-tray's settings page | One row at the foot of the menu launching `nazar-tray --view settings` from its `activate` handler; insensitive with a reason when the tray is not on the path; one launch and one call site, both counted by a test | landed 2026-09-23 |
+| G-WP3 | A reading expires with the window it measured | `panelReading` refuses the number when the binding window is `stale`, or its reset has passed with no tray running; a reset that has passed with the tray up is kept; cannot-tell keeps it; the refused row's detail carries the cause | landed 2026-09-23 |
+| G-WP4 | A dead tray that cannot be misread | Panel dims to 0.4 **and** the value carries a marker; the marker's glyphs are in both Cantarell and Adwaita Sans, pinned by a test | landed 2026-09-23 |
+| G-WP5 | The engine is part of the install | README says the engine must run and how to autostart it, and says why the extension will not do that itself | landed 2026-09-23 |
+
 ## Log
 
 Dated notes for the things that were measured rather than reasoned about, newest last.
+
+### 2026-09-23 · four days of a number that was not wrong about anything
+
+The engine stopped on 17 September and nothing noticed. On the 19th the weekly window it had
+last measured reset. On the 23rd the panel was showing **67 %**, the menu said *reset was due
+19 Sept 02:00* under it, the indicator had been dimmed the whole time — and the real figure,
+once an engine was running again, was **5 %**.
+
+Every individual thing the code did was defensible, which is what makes it worth a log entry:
+
+- The number was a true reading, taken while the tray was alive, and the old rule kept it on
+  the honest argument that quota does not burn while nothing is using it. That argument has a
+  deadline and the code did not know it: it is valid exactly until the window resets, and
+  after that the reading is not stale — it is the wrong answer in the reassuring direction.
+- The menu *did* report the expired reset. "reset was due" is a fact, sitting underneath a
+  number in the same typeface as five other facts; it is not a warning, and it was not read
+  as one.
+- The dimming *was* applied, at 0.55, for four days. Nobody sees a dimmed panel beside an
+  undimmed one, so it read as the way the panel looks.
+
+So three changes rather than one, because any single one of them would have left the failure
+reachable: the reading now expires with its window (G-WP3, the rule is in the contract file
+where a test can reach it), the dead-tray state changes the text and not only the paint
+(G-WP4), and the README stops treating the engine as somebody else's problem (G-WP5). What is
+deliberately *not* here is an extension that starts or restarts the engine: the fix for a
+daemon that does not come back is an autostart entry, not a panel face growing the ability to
+spawn things.
 
 ### 2026-09-23 · what `nazar-tray --view settings` actually does to a running engine
 
@@ -157,3 +197,34 @@ whether `settings` was honoured; and `nazar-tray --help` does not print a usage 
 with an instance running it is treated as a request to show the panel, and with none running
 it starts the application. Neither changes what the gear should do: the command is correct
 against the tray's own CLI contract, and it stays.
+
+### 2026-09-23 · what the nested session could check, and what it could not
+
+The harness, because the command matters as much as the result: the zip from `make zip`
+unpacked into a scratch `XDG_DATA_HOME`, a scratch `NAZAR_HOME` holding fabricated documents,
+and
+
+```sh
+GSETTINGS_BACKEND=memory dbus-run-session -- \
+  gnome-shell --headless --virtual-monitor 1280x720
+```
+
+with the extension enabled over that session's own bus
+(`org.gnome.Shell.Extensions.EnableExtension`) so that the write lands in the memory backend
+and not in the live session's dconf. That precaution is not theoretical: a nested Shell
+started without it once turned off twelve of the maintainer's extensions. `gsettings get
+org.gnome.shell enabled-extensions` was compared before and after and came back identical.
+
+Driven through seven documents — a live engine, a dead tray with the reset still ahead, a
+dead tray with the reset gone by, a `stale` binding window, a damaged file, no file at all,
+and the engine back — the extension reported `state: 1` with an empty `error` at every step,
+and again after ten disable/enable cycles. The Shell's own log carried no JS error, no
+warning from this extension and nothing about a missing icon, which is the evidence that
+`emblem-system-symbolic` resolves and that the new menu row builds.
+
+What it could not do is look at the result. `org.gnome.Shell.Screenshot` answered
+*Screenshot is not allowed* in the nested session too, and `org.gnome.Shell.Eval` is closed
+outside unsafe mode, so the panel's actual text — the marker, the `?`, the gear's glyph — is
+still something only a person in a real session can confirm. That is the same wall
+[screenshots/README.md](screenshots/README.md) describes, met from the other side, and it is
+why those three lines are on the release checklist.

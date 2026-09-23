@@ -20,7 +20,7 @@ git pull --ff-only
 git status --porcelain          # must print nothing
 
 gh run list --branch main --limit 3      # CI green on the commit you are about to tag
-make check                               # 27 tests, locally, under your own gjs
+make check                               # 35 tests, locally, under your own gjs
 make zip
 ```
 
@@ -37,8 +37,15 @@ Look at it with nazar-tray running as the engine (`nazar-tray --headless`) and a
 stopped, and confirm four things by eye, because all four are things a user sees first:
 
 - the bead and a percentage in the panel, and the panel button opens a menu;
-- the number dims when the tray is not running, and does not disappear;
-- `?` and not `0%` when `~/.nazar` has nothing to read;
+- the number dims **and grows its `··` marker** when the tray is not running, and does not
+  disappear;
+- `?` and not `0%` when `~/.nazar` has nothing to read, and `?` again when the binding
+  window's reset has passed with no tray running — the menu row saying why;
+- the gear at the foot of the menu opens nazar-tray's settings page, with the engine
+  already running headless, and the engine is still running afterwards (`pgrep -a
+  nazar-tray`, and a heartbeat in `~/.nazar/limits.lock` less than a minute old). This is
+  the one step a nested session cannot take for you: see the log entry in
+  [PROJECT.md](PROJECT.md) for what was measured from outside and what was not;
 - `journalctl --user -f | grep -i nazar` stays quiet while the panel is simply working.
 
 And check the two documents a stranger reads before the code: the README's screenshot exists
@@ -153,7 +160,7 @@ paragraph of reassurance.
 | No excessive logging | Nothing is logged in the ordinary path. A genuine failure logs one line, and `_warnOnce` will not log the same line twice. |
 | No GTK in `extension.js` | There is no `prefs.js` and no GTK import anywhere; v1 has no preferences. |
 | `metadata.json` says only what it should | No `version` (the site assigns it), no `session-modes` (`user` is the default), and no `settings-schema` or `gettext-domain`, which would each promise a directory this extension does not ship. CI asserts the last two are absent. |
-| Small diffs are reviewed sooner | 532 lines of code without comments, one purpose, no dependencies. |
+| Small diffs are reviewed sooner | About 640 lines of code without comments, one purpose, no dependencies. |
 
 ### 3.4 After the upload
 
@@ -190,7 +197,7 @@ rm -rf ~/.local/share/gnome-shell/extensions/nazar-gnome@xfurqan0.github.io
 
 ## 5. What is deliberately not automated
 
-- **No release workflow.** A tag does not build or publish anything here. The zip is 14 KB
+- **No release workflow.** A tag does not build or publish anything here. The zip is 17 KB
   and `make zip` takes a second, so a pipeline would add a place for a release to go wrong
   without saving a minute.
 - **No store submission from CI.** extensions.gnome.org has an upload form and a human on
