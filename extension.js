@@ -18,9 +18,6 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 import * as Contract from './lib/contract.js';
 
-/** What `npx @xfurqan0/nazar` binds. The menu offers it; nothing here ever connects to it. */
-const CANVAS_URI = 'http://127.0.0.1:4676';
-
 /** Countdowns and ages move with the clock, so the panel is redrawn on a slow tick. */
 const TICK_SECONDS = 30;
 
@@ -265,10 +262,6 @@ export default class NazarExtension extends Extension {
         menu.addMenuItem(infoItem(Contract.trayLine(tray), tray.running ? 'nazar-note' : 'nazar-alert'));
         if (!tray.running)
             menu.addMenuItem(infoItem('start nazar-tray --headless', 'nazar-note'));
-
-        const canvas = new PopupMenu.PopupMenuItem('Open Nazar canvas');
-        canvas.connect('activate', () => this._openCanvas());
-        menu.addMenuItem(canvas);
     }
 
     _providerItem(view) {
@@ -314,19 +307,6 @@ export default class NazarExtension extends Extension {
             x_align: Clutter.ActorAlign.END,
         }));
         return item;
-    }
-
-    /**
-     * Hand a URI to whatever the user opens URIs with. This is not a subprocess: the
-     * browser is launched by the session's own handler, the same way a link in any Shell
-     * menu is, and this extension neither talks to it nor learns anything back.
-     */
-    _openCanvas() {
-        try {
-            Gio.AppInfo.launch_default_for_uri(CANVAS_URI, global.create_app_launch_context(0, -1));
-        } catch (error) {
-            this._warnOnce(`could not open ${CANVAS_URI}: ${error.message}`);
-        }
     }
 
     /** One line per distinct problem. A log line every tick is a rejected extension. */

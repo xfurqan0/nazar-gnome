@@ -364,6 +364,12 @@ test('the extension opens no socket, runs no program and writes no file', () => 
         'Soup', 'fetch(', 'XMLHttpRequest', 'Gio.SocketClient', 'DBusProxy',
         'replace_contents', 'append_to', 'delete_async', 'make_directory',
         'GLib.file_set_contents', 'Secret', 'St.Clipboard',
+
+        // The menu used to offer Nazar's canvas on a loopback URL, and the offer is gone:
+        // a quota face that hands a `http://127.0.0.1:…` address to the session's browser
+        // is guessing which port somebody's Nazar is on and opening a page in their name
+        // for it. Both names are listed so that putting the item back fails here first.
+        'launch_default_for_uri', '127.0.0.1',
     ];
     for (const name of forbidden)
         ok(!source.includes(name), `${name} has no business in a face`);

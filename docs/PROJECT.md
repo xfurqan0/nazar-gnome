@@ -66,10 +66,9 @@ now pinned by a test or a comment:
 
 `gjs.guide/extensions/review-guidelines`, the two sections that reject extensions:
 
-- **No binaries, no subprocesses, no privilege elevation.** None, anywhere. The one thing
-  that leaves the process is `Gio.AppInfo.launch_default_for_uri` on the Nazar canvas's
-  loopback address, which hands a URI to the session's own handler exactly as any Shell
-  menu link does.
+- **No binaries, no privilege elevation, and nothing started on its own.** No binary is
+  shipped, nothing is elevated, and nothing at all runs on a tick, on a timer or when the
+  panel is drawn.
 - **`disable()` undoes `enable()`.** Every source removed, the monitor cancelled and
   disconnected, the cancellable cancelled, the button destroyed, every field dropped. A
   test reads both bodies and fails if `enable()` sets a field that `disable()` does not let

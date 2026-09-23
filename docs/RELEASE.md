@@ -144,7 +144,7 @@ paragraph of reassurance.
 | The rule | Here |
 |---|---|
 | No binaries, no compiled blobs, readable unminified source | Four hand-written files: `extension.js`, `lib/contract.js`, `stylesheet.css`, `assets/bead.svg`. The CI package check fails on anything else. |
-| No subprocesses, no privilege elevation | None. `tests/run.js` greps the sources for `Gio.Subprocess`, `GLib.spawn`, `spawn_command_line` and eleven more names, and fails if any appears. The only thing that leaves the process is `Gio.AppInfo.launch_default_for_uri` on a loopback URL from a menu item — the same call a link in any Shell menu makes. |
+| No subprocesses, no privilege elevation | Nothing is elevated and nothing is started on a tick, on a timer or while the panel draws. `tests/run.js` greps the sources for `Gio.Subprocess`, `GLib.spawn`, `spawn_command_line` and thirteen more names, and fails if any appears. |
 | No network | No `Soup`, no `fetch`, no socket; same grep. Everything on screen came out of a file another program wrote. |
 | `disable()` must undo everything `enable()` did | Sources removed, monitor cancelled and disconnected, cancellable cancelled, button destroyed, fields dropped. A test reads both method bodies and fails if `enable()` sets a field `disable()` does not release; a nested session ran ten disable/enable cycles and ended with one panel button and no JS errors. |
 | No blocking I/O on the main loop | `load_contents_async` with a `Gio.Cancellable`, never the synchronous call. |

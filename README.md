@@ -14,7 +14,6 @@ Codex                      plus · rollout log · read 1 m ago
   week ◂       ▓▓▓▓▓▓▓░░░    70 %   resets 11 Sept 12:00 · in 4 d 3 h
   ─────────────────────────────────────────────────────────────
   nazar-tray is running (pid 162640, beating < 1 m ago)
-  Open Nazar canvas
 ```
 
 The number in the panel is the **binding** window — the one closest to full, because that
