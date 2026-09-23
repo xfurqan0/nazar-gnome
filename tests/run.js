@@ -32,6 +32,7 @@ import {
     windowLabel,
     windowPercent,
 } from '../lib/contract.js';
+import {MAX_PIDS, RAISE_INTERFACE, RAISE_OBJECT_PATH, chooseWindow} from '../lib/raise.js';
 
 const HERE = GLib.path_get_dirname(GLib.filename_from_uri(import.meta.url)[0]);
 const ROOT = GLib.path_get_dirname(HERE);
@@ -463,6 +464,179 @@ test('`~/.nazar` is resolved the way the writer resolves it', () => {
     equal(dataDir(() => null), null);
 });
 
+// --- Which window a chain of pids means -------------------------------------------------
+
+/** A window as the Shell hands it over, with everything this decision reads. */
+function win(pid, title, wmClass, userTime) {
+    return {pid, title, wmClass, userTime};
+}
+
+/** The chain this machine actually has: claude → bash → ptyxis-agent → ptyxis. */
+const CHAIN = [79700, 79153, 7774, 7766];
+
+test('the nearest ancestor that owns a window wins, and the rest are not consulted', () => {
+    // The point of sending a chain instead of a pid. Neither `claude` nor the shell under it
+    // has a window; `ptyxis` does, four steps up, and the pid past it — the user's systemd —
+    // is never reached because the search stops at the first owner.
+    const windows = [win(7766, 'nazar: linux jump', 'ptyxis', 500), win(4159, 'something', 'other', 900)];
+    const choice = chooseWindow([...CHAIN, 4159], '', windows);
+    equal(choice.window.pid, 7766);
+    equal(choice.detail, 'raised ptyxis');
+});
+
+test('a pid that is not in the list is never raised', () => {
+    // The security claim, as a test rather than as a paragraph: the match is an equality test
+    // against the caller's list, so a terminal window belonging to somebody else's process
+    // tree is invisible to this method no matter how much it looks like the right one.
+    const windows = [win(12345, 'nazar: linux jump', 'ptyxis', 900)];
+    const choice = chooseWindow(CHAIN, 'nazar: linux jump', windows);
+    equal(choice.window, null);
+    equal(choice.detail, 'no window owns any of 4 pids');
+});
+
+test('one pid with several windows goes to the title, and then to recency', () => {
+    // A GNOME-era terminal is one process with a window per window, so this is the ordinary
+    // case. The title is tried first because it is the only signal about the session being
+    // jumped to rather than about the person's last minute of typing.
+    const windows = [
+        win(7766, 'user@host: ~', 'ptyxis', 900),
+        win(7766, 'nazar: linux jump — claude', 'ptyxis', 100),
+        win(7766, 'htop', 'ptyxis', 400),
+    ];
+    const named = chooseWindow(CHAIN, 'linux jump', windows);
+    equal(named.window.title, 'nazar: linux jump — claude');
+    equal(named.detail, 'raised ptyxis; 3 windows share the pid, took the title match');
+
+    const recent = chooseWindow(CHAIN, '', windows);
+    equal(recent.window.title, 'user@host: ~', 'the window last typed in');
+    equal(recent.detail, 'raised ptyxis; 3 windows share the pid, took the most recent');
+
+    // A hint nothing carries falls through to recency rather than matching everything.
+    equal(chooseWindow(CHAIN, 'no window is called this', windows).window.title, 'user@host: ~');
+
+    // And a hint several windows carry takes the most recent of *those*.
+    const ambiguous = chooseWindow(CHAIN, 'ptyxis', [
+        win(7766, 'a ptyxis window', 'ptyxis', 10),
+        win(7766, 'another ptyxis window', 'ptyxis', 20),
+    ]);
+    equal(ambiguous.window.title, 'another ptyxis window');
+});
+
+test('the title match is case-insensitive and does not have to be the whole title', () => {
+    const windows = [
+        win(7766, 'Nazar: Linux Jump', 'ptyxis', 10),
+        win(7766, 'other', 'ptyxis', 20),
+    ];
+    equal(chooseWindow(CHAIN, 'linux JUMP', windows).window.title, 'Nazar: Linux Jump');
+});
+
+test('a tie in recency keeps the first window, so two calls agree', () => {
+    // Strictly greater rather than greater-or-equal. Two windows with the same user time is
+    // not a hypothetical — it is what a terminal that has just been started looks like — and
+    // an answer that depends on the Shell's list order is an answer that moves under the user.
+    const windows = [win(7766, 'first', 'ptyxis', 42), win(7766, 'second', 'ptyxis', 42)];
+    equal(chooseWindow(CHAIN, '', windows).window.title, 'first');
+    equal(chooseWindow(CHAIN, '', windows).window.title, 'first');
+});
+
+test('the detail names the window class first, because the caller puts it in a sentence', () => {
+    // The grammar that crosses the repository boundary: up to the first `; ` is the class and
+    // nothing else, so Nazar can say "raised the ptyxis window" without this interface growing
+    // a third out argument. The rest is prose for a person.
+    const one = chooseWindow([7766], '', [win(7766, 't', 'org.gnome.Console', 5)]);
+    equal(one.detail.split('; ')[0], 'raised org.gnome.Console');
+
+    // A class that would break the grammar has the one character taken out of it, rather than
+    // being trusted not to arrive: it is a string a foreign toolkit sets.
+    const nasty = chooseWindow([7766], '', [win(7766, 't', 'we;ird', 5)]);
+    equal(nasty.detail, 'raised we,ird');
+
+    // And a window with no class at all is a word, not a hole in somebody's sentence.
+    for (const cls of [null, undefined, '', '   '])
+        equal(chooseWindow([7766], '', [win(7766, 't', cls, 5)]).detail, 'raised unknown');
+});
+
+test('nothing usable in the list is an answer, not an exception', () => {
+    equal(chooseWindow([], '', []).detail, 'no usable pid was given');
+    equal(chooseWindow(null, '', []).detail, 'no usable pid was given');
+    equal(chooseWindow([0, -1, 1.5, '7766', null], '', []).detail, 'no usable pid was given',
+        'a zero, a float and a string are not pids');
+    equal(chooseWindow(CHAIN, '', null).detail, 'no window owns any of 4 pids');
+    equal(chooseWindow(CHAIN, '', []).detail, 'no window owns any of 4 pids');
+    equal(chooseWindow([7766, 7766, 7766], '', []).detail, 'no window owns any of 1 pids',
+        'the same pid twice is one pid');
+});
+
+test('a window Mutter could not attribute to a process matches nothing', () => {
+    // `get_pid()` answers `-1` where it does not know, and a caller that happened to send a
+    // list containing nothing would otherwise match every one of those.
+    equal(chooseWindow([7766], '', [win(-1, 't', 'ptyxis', 5), win(7766, 'u', 'ptyxis', 5)]).window.title, 'u');
+});
+
+test('the list a stranger can send is bounded', () => {
+    // This method is reachable by anything on the session bus. Nazar walks eight ancestors, so
+    // sixteen is room for it to change its mind; what it is not is an unbounded loop over a
+    // list somebody else controls.
+    equal(MAX_PIDS, 16);
+    const many = [];
+    for (let pid = 1; pid <= 100; pid += 1)
+        many.push(pid);
+    equal(chooseWindow(many, '', []).detail, `no window owns any of ${MAX_PIDS} pids`);
+});
+
+test('the interface declares exactly one method and nothing else', () => {
+    // The whole architecture of this addition is "one verb, lent to another program". A second
+    // method, a property or a signal is a different shape of thing and should not arrive
+    // quietly in a diff: a property is a read of the Shell's state by anybody on the bus, and
+    // a signal is this extension telling the bus what the session is doing.
+    equal(occurrences(RAISE_INTERFACE, '<method '), 1, 'one method');
+    equal(occurrences(RAISE_INTERFACE, '<property'), 0, 'no properties');
+    equal(occurrences(RAISE_INTERFACE, '<signal'), 0, 'no signals');
+    equal(occurrences(RAISE_INTERFACE, '<interface '), 1);
+    ok(RAISE_INTERFACE.includes('name="org.gnome.Shell.Extensions.Nazar"'));
+    ok(RAISE_INTERFACE.includes('<method name="Raise">'));
+
+    // The signature, spelled out, because it is what the other repository compiles against.
+    for (const arg of [
+        '<arg type="au" direction="in" name="pids"/>',
+        '<arg type="s" direction="in" name="title_hint"/>',
+        '<arg type="b" direction="out" name="raised"/>',
+        '<arg type="s" direction="out" name="detail"/>',
+    ])
+        ok(RAISE_INTERFACE.includes(arg), arg);
+
+    equal(RAISE_OBJECT_PATH, '/org/gnome/Shell/Extensions/Nazar');
+});
+
+test('the method is exported once, in enable(), and given up in disable()', () => {
+    // A call-site count rather than a grep for a name, the same shape of check as the one
+    // above the tray launch: an export that migrated into the tick or into a menu handler
+    // would fail here before anybody ran a Shell, and an unexport that went missing is how an
+    // extension answers D-Bus calls after it has been switched off.
+    const source = read(`${ROOT}/extension.js`);
+    equal(occurrences(source, 'wrapJSObject'), 1, 'one wrapped object in the whole tree');
+    equal(occurrences(source, '.export('), 1, 'one export');
+    equal(occurrences(source, '.unexport('), 1, 'one unexport');
+
+    const enable = between(source, '    enable() {', '    disable() {');
+    const disable = between(source, '    disable() {', '\n    /** A rename');
+    ok(enable.includes('.export(Gio.DBus.session, RAISE_OBJECT_PATH)'), 'exported in enable()');
+    ok(!enable.includes('.unexport('));
+    ok(disable.includes('.unexport()'), 'given up in disable()');
+    ok(disable.includes('this._raiseService = null'), 'and the reference dropped with it');
+
+    // The handler answers rather than throws: a JS exception arrives at the caller as an error
+    // name it has to tell apart from a transport failure, and "no such window" is not that.
+    const handler = between(source, '    Raise(pids, titleHint) {', '\n    /** One line per');
+    ok(handler.includes('try {') && handler.includes('} catch (error) {'), 'nothing throws out of Raise');
+    ok(handler.includes('Meta.WindowType.NORMAL'), 'normal windows only; a tooltip is not a jump');
+    ok(handler.includes('Main.activateWindow('), 'the Shell wrapper, which also closes the overview');
+    ok(handler.includes('global.get_current_time()'), 'a real timestamp, or the focus is refused');
+    ok(handler.includes('chooseWindow('), 'and the decision is made where a test can reach it');
+    ok(!handler.includes('activate(') || handler.includes('Main.activateWindow('),
+        'no second activation path beside the Shell wrapper');
+});
+
 // --- What the Shell half must never contain ---------------------------------------------
 
 test('the extension opens no socket, spawns nothing and writes no file', () => {
@@ -472,7 +646,15 @@ test('the extension opens no socket, spawns nothing and writes no file', () => {
     // architecture's whole claim is that we never go near it. The one program this
     // extension launches goes through an app info and the session's own launch context, not
     // through any name below, and the test under this one is what pins that down.
-    const source = [read(`${ROOT}/extension.js`), read(`${ROOT}/lib/contract.js`)].join('\n');
+    // Every JS file in the package, named one by one rather than globbed: a file that is
+    // added to `lib/` and forgotten here is a file with none of this applied to it, and the
+    // list being short is the point — this is four hand-written files, and the day it is not
+    // this line should be the thing that notices.
+    const source = [
+        read(`${ROOT}/extension.js`),
+        read(`${ROOT}/lib/contract.js`),
+        read(`${ROOT}/lib/raise.js`),
+    ].join('\n');
     const forbidden = [
         'Gio.Subprocess', 'GLib.spawn', 'spawn_async', 'spawn_command_line',
         'Soup', 'fetch(', 'XMLHttpRequest', 'Gio.SocketClient', 'DBusProxy',

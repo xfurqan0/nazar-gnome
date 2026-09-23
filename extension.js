@@ -10,10 +10,20 @@
 // drawn. The single exception is the gear at the foot of the menu, which launches
 // nazar-tray's own settings page when a person clicks it, and that is the whole of it: one
 // command, one call site, reached only from an `activate` handler, checked by a test.
+//
+// Since 23 September there is a second thing in here that is not the panel: one D-Bus method,
+// `Raise`, exported on the Shell's own connection. It exists because of a restriction rather
+// than an ambition — under Wayland a program cannot raise a window it does not own, by
+// design, and the only process in the session that can raise anybody's window is the
+// compositor. Nazar's desktop shell wants to put a terminal in front of you when you pick a
+// session on its canvas; it cannot, and gnome-shell can, so the extension that is already
+// inside gnome-shell lends it the one verb. Everything that decides *which* window lives in
+// lib/raise.js for the same reason the arithmetic lives in lib/contract.js.
 
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
+import Meta from 'gi://Meta';
 import St from 'gi://St';
 
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
@@ -22,6 +32,7 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 import * as Contract from './lib/contract.js';
+import {RAISE_INTERFACE, RAISE_OBJECT_PATH, chooseWindow} from './lib/raise.js';
 
 /**
  * The tray's own settings page, and the only command this extension ever launches.
@@ -78,6 +89,7 @@ export default class NazarExtension extends Extension {
         this._monitorId = 0;
         this._openId = 0;
         this._lastWarning = null;
+        this._raiseService = null;
 
         const dir = Contract.dataDir(name => GLib.getenv(name));
         this._dirPath = dir;
@@ -143,10 +155,39 @@ export default class NazarExtension extends Extension {
             return GLib.SOURCE_CONTINUE;
         });
 
+        // The `Raise` method, on the Shell's own session-bus connection.
+        //
+        // `Gio.DBus.session` rather than a connection of our own, because an extension has no
+        // bus name it could claim: this lands under `org.gnome.Shell`, which is the name
+        // gnome-shell already owns, and that is the point — a caller that finds nothing there
+        // has learned something true about the session rather than about our plumbing.
+        //
+        // In a try/catch because an export can genuinely fail: a path is claimed once per
+        // connection, so a previous disable() that did not run its unexport (a Shell that was
+        // killed rather than restarted, a reload in the middle of an error) leaves the address
+        // occupied. The panel is the extension's job and the method is a favour it does for
+        // another program, so a failure here is one warning line and a panel that still works,
+        // not an enable() that throws and takes the face down with it.
+        try {
+            this._raiseService = Gio.DBusExportedObject.wrapJSObject(RAISE_INTERFACE, this);
+            this._raiseService.export(Gio.DBus.session, RAISE_OBJECT_PATH);
+        } catch (error) {
+            this._raiseService = null;
+            this._warnOnce(`could not export ${RAISE_OBJECT_PATH}: ${error.message}`);
+        }
+
         this._read();
     }
 
     disable() {
+        // First, because it is the one thing in here another process is holding a reference
+        // to. A method that is still answering after disable() is a lock screen away from
+        // being a method that raises windows on behalf of a disabled extension, and unexport
+        // is also what frees the path for the next enable().
+        if (this._raiseService) {
+            this._raiseService.unexport();
+            this._raiseService = null;
+        }
         if (this._tickId) {
             GLib.source_remove(this._tickId);
             this._tickId = 0;
@@ -394,6 +435,69 @@ export default class NazarExtension extends Extension {
                 .launch([], global.create_app_launch_context(0, -1));
         } catch (error) {
             this._warnOnce(`could not start ${TRAY_SETTINGS_COMMAND}: ${error.message}`);
+        }
+    }
+
+    /**
+     * `Raise(au pids, s title_hint) → (b raised, s detail)` — the D-Bus method.
+     *
+     * The caller hands over an ancestor chain, nearest first, and gets back whether a window
+     * was brought forward and a sentence about it. lib/raise.js decides which window; this
+     * method's whole job is the two things that need a Shell: reading the window list, and
+     * activating the one that was chosen.
+     *
+     * **What it can and cannot be made to do, since anything on the session bus can call it.**
+     * It raises a window whose pid the caller already named, and there is nothing else in it:
+     * no process is started, no file is read or written, nothing is closed, moved, resized or
+     * killed, and a pid that is not in the list is never touched — the match is an equality
+     * test against the list, not a search outwards from it. The worst a hostile caller
+     * achieves is a window of its own coming to the front, which it could do by asking the
+     * toolkit. What it does *not* get is a window list: a caller that guesses pids learns only
+     * `true` or `false` about a pid it already guessed, and the class name of a window it
+     * just raised into its own view. That is a smaller leak than the one every session bus
+     * already has through `org.gnome.Shell.Introspect`, and it is the reason this is one
+     * method with two out arguments rather than a query interface.
+     *
+     * Normal windows only, and that is a correctness rule rather than a tidiness one: a
+     * terminal's own dialogs, menus and tooltips are separate Meta windows carrying the same
+     * pid, and activating a tooltip is a jump that appears to do nothing at all.
+     *
+     * Nothing throws out of here. A JS exception in a D-Bus handler reaches the caller as an
+     * error name it then has to tell apart from a transport failure, and "the Shell had a bug"
+     * and "there is no such window" are not the same news. So the answer is always an answer.
+     */
+    Raise(pids, titleHint) {
+        try {
+            const windows = [];
+            for (const actor of global.get_window_actors()) {
+                const meta = actor.meta_window;
+                if (!meta || meta.get_window_type() !== Meta.WindowType.NORMAL)
+                    continue;
+                windows.push({
+                    pid: meta.get_pid(),
+                    title: meta.get_title(),
+                    wmClass: meta.get_wm_class(),
+                    userTime: meta.get_user_time(),
+                    meta,
+                });
+            }
+
+            const choice = chooseWindow(pids, titleHint, windows);
+            if (!choice.window)
+                return [false, choice.detail];
+
+            // `Main.activateWindow` rather than `meta_window.activate` on its own, and the
+            // difference is everything the caller would otherwise have to ask for separately.
+            // Mutter's activate already unminimises the window and its transient parents and
+            // moves to the workspace the window is on — a jump that focuses a window on
+            // workspace 3 while leaving you looking at workspace 1 is not a jump — and the
+            // Shell's wrapper adds the half Mutter cannot know about: it closes the overview
+            // and the calendar. Without that, a jump triggered while the Activities view is
+            // open focuses a window nobody can see behind it.
+            Main.activateWindow(choice.window.meta, global.get_current_time());
+            return [true, choice.detail];
+        } catch (error) {
+            return [false, `the Shell could not raise a window: ${error.message}`];
         }
     }
 

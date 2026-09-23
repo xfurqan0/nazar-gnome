@@ -77,7 +77,7 @@ jobs:
           # The other direction, because a package can also be wrong by being short: an
           # extension that packs without lib/ or assets/ installs cleanly and comes up
           # broken, which is the quiet version of this mistake.
-          for required in metadata.json extension.js stylesheet.css lib/contract.js assets/bead.svg; do
+          for required in metadata.json extension.js stylesheet.css lib/contract.js lib/raise.js assets/bead.svg; do
             if ! grep -qx "$required" "${RUNNER_TEMP}/packed.txt"; then
               echo "::error::${required} is missing from the package"
               status=1
