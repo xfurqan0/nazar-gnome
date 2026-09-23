@@ -30,9 +30,17 @@
 }
 
 /* The tray is not running. The number is real and no longer maintained, so the indicator
- * is dimmed rather than recoloured: recolouring would say something about the quota. */
+ * is dimmed rather than recoloured: recolouring would say something about the quota.
+ *
+ * 0.4, and it started at 0.55. 0.55 is a designer's dim: it reads as deliberate beside a
+ * full-strength label and is invisible on its own, which is the only way a panel is ever
+ * seen -- somebody read a number off a panel dimmed to 0.55 for four days without noticing
+ * it was dimmed at all. So it is lower now, and it is no longer the only signal: the value
+ * itself grows a marker in extension.js, because opacity is a difference you have to have
+ * seen the other state to notice. Much below 0.35 stops being a warning and becomes a
+ * legibility bug -- the number still has to be readable, since it is still true. */
 .nazar-stale {
-  opacity: 0.55;
+  opacity: 0.4;
 }
 
 /* Nothing could be read -- not "nothing has been used". The bead dims with the `?`. */

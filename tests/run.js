@@ -515,6 +515,30 @@ test('the one program it ever starts is the tray\'s own settings page', () => {
     ok(source.includes('setSensitive(false)'));
 });
 
+test('the dead-tray marker is text both panel fonts can draw', () => {
+    // A marker that falls through to a fallback font is a marker nobody checked: `⏸` is in
+    // neither Cantarell nor Adwaita Sans and arrives from Noto Color Emoji, and `‖` is in
+    // Adwaita Sans but not in Cantarell, which is what GNOME 46 draws a panel with. The
+    // allowlist below is the set this was verified against with `fc-list :charset=…` in both
+    // faces, and a future edit that reaches for a prettier glyph fails here rather than on
+    // somebody's GNOME 46 panel.
+    const source = read(`${ROOT}/extension.js`);
+    const declared = /const NOT_RUNNING_MARKER = '([^']*)';/.exec(source);
+    ok(declared, 'the marker is one constant, not a literal buried in _render');
+
+    const marker = declared[1];
+    ok(marker.trim().length > 0, 'a state with no visible difference is not a state');
+    ok(!marker.includes('?'), '`?` means could-not-be-read and may not be borrowed for this');
+    for (const character of marker) {
+        const point = character.codePointAt(0).toString(16).toUpperCase();
+        ok(character === ' ' || character === '·', `U+${point} is not in both panel fonts`);
+    }
+
+    // And it is appended rather than substituted: the number is still true and still shown.
+    ok(source.includes('NOT_RUNNING_MARKER'), 'used, not merely declared');
+    ok(/value \+ NOT_RUNNING_MARKER/.test(source), 'the percentage keeps its place in front of it');
+});
+
 test('everything enable() creates, disable() releases', () => {
     // The first thing a reviewer reads, and the thing every leak in a Shell extension comes
     // down to: a source added or an object built in enable() and left behind afterwards.

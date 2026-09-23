@@ -18,8 +18,9 @@ Codex                      plus · rollout log · read 1 m ago
 ```
 
 The number in the panel is the **binding** window — the one closest to full, because that
-is the one that stops you. Amber at 60 %, red at 85 %, dimmed when nazar-tray is not
-running, and `?` when a window could not be read, which is never a reassuring `0 %`.
+is the one that stops you. Amber at 60 %, red at 85 %, dimmed and marked `··` when
+nazar-tray is not running, and `?` when a window could not be read or the reading has
+outlived the window it measured — which is never a reassuring `0 %`.
 
 ## Screenshot
 
@@ -93,7 +94,7 @@ statement of that is here rather than nowhere.
 | `70%` | The binding window, rounded **down**. 99.6 % is `99%`, because a panel that says a window is spent when it is not is wrong at the moment it matters most. |
 | `?` | Nothing could be read, **or the reading has outlived its window** — see below. Not "nothing has been used": the two are opposite messages to somebody about to start a long task. |
 | amber, red | 60 % and 85 %, the thresholds nazar-tray itself warns at. |
-| dimmed | nazar-tray is not running. The number stays while it can still be true — quota does not burn while nothing is using it — and the whole indicator dims. |
+| `5% ··` | nazar-tray is not running. The number stays while it can still be true — quota does not burn while nothing is using it — and the whole indicator dims to 0.4 **and** grows the two dots. Opacity alone is a difference you have to have seen the other state to notice, and this one went unnoticed for four days. |
 
 A reading expires with the window it measured. If the binding window's reset has passed and
 nazar-tray is **not** running, there is nothing left to correct the number and the panel

@@ -35,6 +35,25 @@ import * as Contract from './lib/contract.js';
 const TRAY_PROGRAM = 'nazar-tray';
 const TRAY_SETTINGS_COMMAND = `${TRAY_PROGRAM} --view settings`;
 
+/**
+ * What is appended to the panel's number while nazar-tray is not running.
+ *
+ * Opacity alone was not enough. A dimmed panel is only dim next to the same panel undimmed,
+ * and nobody sees both: a number that had been faded for four days was read as current, so
+ * the state now changes the text as well as the paint.
+ *
+ * Two middle dots, and the alternatives were measured rather than guessed. `⏸` U+23F8 is the
+ * obvious choice and the wrong one — neither Cantarell nor Adwaita Sans carries it, so
+ * fontconfig falls through to Noto Color Emoji and the panel gets a colour pictograph of a
+ * different size and weight from the number beside it. `‖` U+2016 is in Adwaita Sans, the
+ * GNOME 47+ default, but not in Cantarell, which is what GNOME 46 draws a panel with, and a
+ * marker that silently changes font on two of the five Shell versions this zip claims is a
+ * marker that has to be checked twice. `·` U+00B7 is in both, at the same weight as the
+ * digits, and doubled it reads as a pause without being a picture of one. No `?`: the
+ * question mark means "could not be read", which is a different state and must stay its own.
+ */
+const NOT_RUNNING_MARKER = ' ··';
+
 /** Countdowns and ages move with the clock, so the panel is redrawn on a slow tick. */
 const TICK_SECONDS = 30;
 
@@ -229,7 +248,8 @@ export default class NazarExtension extends Extension {
         const reading = Contract.panelReading(this._doc, {now, running: tray.running});
 
         // Rule 2 in the one place everybody looks: a question mark, never a reassuring 0 %.
-        this._label.text = reading.percent === null ? '?' : `${reading.percent}%`;
+        const value = reading.percent === null ? '?' : `${reading.percent}%`;
+        this._label.text = tray.running ? value : value + NOT_RUNNING_MARKER;
 
         this._label.style_class = `nazar-value${textClass(reading.severity)}`;
 
