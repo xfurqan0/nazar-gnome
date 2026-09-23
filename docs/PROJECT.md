@@ -133,6 +133,7 @@ reason it did not think of first.
 | G-WP3 | A reading expires with the window it measured | `panelReading` refuses the number when the binding window is `stale`, or its reset has passed with no tray running; a reset that has passed with the tray up is kept; cannot-tell keeps it; the refused row's detail carries the cause | landed 2026-09-23 |
 | G-WP4 | A dead tray that cannot be misread | Panel dims to 0.4 **and** the value carries a marker; the marker's glyphs are in both Cantarell and Adwaita Sans, pinned by a test | landed 2026-09-23 |
 | G-WP5 | The engine is part of the install | README says the engine must run and how to autostart it, and says why the extension will not do that itself | landed 2026-09-23 |
+| G-WP6 | One D-Bus method, so Nazar can raise a terminal | `org.gnome.Shell.Extensions.Nazar.Raise(au pids, s title_hint) → (b raised, s detail)` at `/org/gnome/Shell/Extensions/Nazar`; the choice of window is pure and in `lib/raise.js`; exported once in `enable()`, unexported in `disable()`, both counted by a test; the interface declares one method and no property or signal; a pid outside the caller's list is never raised; every branch driven over a nested session's own bus | landed 2026-09-23 |
 
 ## Log
 
@@ -228,3 +229,83 @@ outside unsafe mode, so the panel's actual text — the marker, the `?`, the gea
 still something only a person in a real session can confirm. That is the same wall
 [screenshots/README.md](screenshots/README.md) describes, met from the other side, and it is
 why those three lines are on the release checklist.
+
+### 2026-09-23 · a face that grew a verb, and what the nested session said about it
+
+This repository was built on the claim that it is a **reader**: one file in, a panel out, and
+nothing in it that acts on the session. G-WP6 is the first thing that acts, so it is worth
+writing down why it is not a hole in that claim.
+
+Nazar's desktop shell draws a canvas of running Claude Code sessions and wants a double-click
+on a card to put that session's terminal in front of you. Under Wayland it cannot: a client
+may not raise a window it does not own, which is the protocol working as designed and not an
+omission. The only process in the session that *can* is the compositor. So either Nazar does
+without on the desktop where most of its users are, or something inside gnome-shell lends it
+the one verb — and the thing inside gnome-shell that both projects already share is this
+extension. One method, two out arguments, no state: `Raise(au pids, s title_hint) → (b raised,
+s detail)`.
+
+The part that took the thinking is that the caller cannot name a window, or even the pid that
+owns one. On this machine the session's own chain is `claude(79700) → bash(79153) →
+ptyxis-agent(7774) → ptyxis(7766)`, and the window belongs to the last of those. Nazar knows
+the first. So what crosses the bus is the **whole chain, nearest ancestor first**, and the side
+that can see windows walks it until a pid turns out to own something. The alternative was for
+Nazar to guess which ancestor is the emulator by name, which means a list of terminal names in
+a program that has no business knowing any of them.
+
+One pid with several windows is then the ordinary case rather than the exotic one — Ptyxis,
+gnome-terminal and kgx are each a single process with a window per window — so the pick is
+ranked: the window whose title contains the hint Nazar sends (the session's own title, which
+the emulator usually puts in the title bar), and failing that the most recently used, with the
+detail string saying which of the two happened. All of that is in `lib/raise.js`, which imports
+nothing, for the same reason `lib/contract.js` imports nothing: the extension does the two
+things only a Shell can do — list windows, activate one — and the decision is somewhere a test
+can drive it through a window list that never existed.
+
+**Measured in the nested session**, harness exactly as the entry above (scratch
+`XDG_DATA_HOME`, `GSETTINGS_BACKEND=memory dbus-run-session -- gnome-shell --headless
+--virtual-monitor 1280x720 --wayland-display nazar-nested`, extension enabled over that
+session's own bus; `gsettings get org.gnome.shell enabled-extensions` identical before and
+after). `gdbus introspect` on `/org/gnome/Shell/Extensions/Nazar` printed the interface with
+`Raise(in au pids, in s title_hint, out b raised, out s detail)` and nothing else. Then, with
+a two-window GJS/GTK4 process (pid 159010, titles *nazar alpha window* and *nazar beta
+window*) and a `gnome-text-editor` with one window (pid 158357):
+
+| Call | Answer |
+|---|---|
+| `Raise([158357], "")` — one normal window | `(true, 'raised org.gnome.TextEditor')` |
+| `Raise([424242], "")` — a pid nobody owns | `(false, 'no window owns any of 1 pids')` |
+| `Raise([424242, 424243, 158357], "")` — the owner is third in the chain | `(true, 'raised org.gnome.TextEditor')` |
+| `Raise([], "")` | `(false, 'no usable pid was given')` |
+| `Raise([159010], "")` — two windows, no hint | `(true, 'raised gjs; 2 windows share the pid, took the most recent')` |
+| `Raise([159010], "alpha")` | `(true, 'raised gjs; 2 windows share the pid, took the title match')` |
+| `Raise([159010], "NAZAR ALPHA")` — case | `(true, 'raised gjs; 2 windows share the pid, took the title match')` |
+| `Raise([159010], "gamma")` — a hint nothing carries | `(true, 'raised gjs; 2 windows share the pid, took the most recent')` |
+| after `DisableExtension` | `GDBus.Error:org.freedesktop.DBus.Error.UnknownMethod: object does not exist at path` |
+| after ten disable/enable cycles | `(true, 'raised gjs; 2 windows share the pid, took the title match')`, `state: 1`, empty `error`, no JS error in the Shell's log |
+
+Three things that reading the code would not have produced:
+
+- **`zenity --info` is useless as a test window.** It is a dialog, so `Raise` correctly
+  declines to touch it — and that is the filter earning its place rather than a bug: a
+  terminal's own dialogs, menus and tooltips are separate Meta windows carrying the *same*
+  pid, and a jump that activates a tooltip appears to do nothing at all.
+- **`gnome-text-editor` is no use for the multi-window case either**, because it is tabbed:
+  a second invocation adds a tab to the one window. The two-windows-one-pid case had to be
+  built on purpose, with two `Gtk.Window`s in one GJS process.
+- **The error name a missing extension produces is `UnknownMethod`, not `UnknownObject`.**
+  GDBus answers a call on an unexported path with `UnknownMethod` and the text *object does
+  not exist at path*, so a caller that only maps `UnknownObject` to "the extension is not
+  installed" will show the user a raw D-Bus error instead of a sentence. Nazar maps all four
+  of `ServiceUnknown`, `UnknownObject`, `UnknownMethod` and `UnknownInterface` to the same
+  advice for exactly this reason.
+
+What the nested session still cannot say is whether a window visibly came to the front:
+`org.gnome.Shell.Eval` is closed outside unsafe mode and `Introspect.GetWindows` answers *not
+allowed*, which is the same wall as the screenshots. `Main.activateWindow` is used rather than
+`meta_window.activate` on its own so that the two cases nobody would remember to ask for are
+covered — Mutter's activate unminimises the window and its transient parents and moves to the
+workspace it is on, and the Shell's wrapper closes the overview and the calendar, without which
+a jump made from the Activities view focuses a window nobody can see. That the focus lands
+where it should is a line for a person with the session in front of them, and it is on the
+release checklist with the other three.

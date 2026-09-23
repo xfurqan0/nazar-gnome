@@ -33,7 +33,7 @@ what to check before committing one.
 
 ## What it is
 
-Four files of hand-written GJS that read one file: `~/.nazar/limits.json`, which
+Five files of hand-written GJS that read one file: `~/.nazar/limits.json`, which
 [nazar-tray](https://github.com/xfurqan0/nazar-tray) already writes. That file is a
 [published contract](https://github.com/xfurqan0/nazar-tray/blob/main/docs/limits-contract.md)
 — one writer, many readers — so this extension has nothing to work out. It does not decide
@@ -53,6 +53,46 @@ What it therefore never does:
 - **No credentials.** `limits.json` carries none by contract, and nothing else is opened.
 - **No writing.** Not a cache, not a "last good value", not a lock. `~/.nazar` has one
   writer and this is not it.
+- **One method on the session bus, and nothing else on it.** It exports one D-Bus method on
+  the session bus so that Nazar's desktop shell can ask it to raise a terminal window the
+  caller already names by pid; anything on your session bus could call it, and all it can do
+  is raise a window you own. See below.
+
+## The one thing it does that is not the panel
+
+Under Wayland an application cannot raise a window it does not own — that is the protocol
+working as designed, not a gap — so the only process in the session that can bring somebody
+else's terminal to the front is the compositor. [Nazar](https://github.com/xfurqan0/nazar)
+draws a canvas of running Claude Code sessions and wants a double-click on a card to put that
+session's terminal in front of you. It cannot; gnome-shell can; so this extension, which is
+already inside gnome-shell, lends it exactly one verb:
+
+```
+org.gnome.Shell   /org/gnome/Shell/Extensions/Nazar
+org.gnome.Shell.Extensions.Nazar.Raise(au pids, s title_hint) → (b raised, s detail)
+```
+
+The caller hands over a **process chain** rather than a window — `claude → bash →
+ptyxis-agent → ptyxis`, nearest first — because the process Nazar knows about is never the
+one holding the window. The first pid in that list that owns a normal window wins. A terminal
+with several windows open is the ordinary case, so the choice is ranked rather than arbitrary:
+the window whose title contains the hint, and failing that the one most recently used, with
+the detail string saying which of the two happened.
+
+What it can be made to do by anything else on your bus is the whole of the above and no more.
+It raises a window whose pid the caller already named — the match is an equality test against
+the list, never a search outwards from it — and it starts no process, reads and writes no
+file, and closes, moves and kills nothing. It is also not a window list: a caller learns
+`true` or `false` about a pid it already guessed, which is less than
+`org.gnome.Shell.Introspect` gives away to the same caller.
+
+You can try it by hand, which is also how it is tested:
+
+```sh
+gdbus call --session --dest org.gnome.Shell \
+  --object-path /org/gnome/Shell/Extensions/Nazar \
+  --method org.gnome.Shell.Extensions.Nazar.Raise "[$$]" ""
+```
 
 ## Why GNOME needs this, and where it does not
 
@@ -170,18 +210,22 @@ a week-old document beside a fresh heartbeat is a quiet week, not a broken tray.
 make check
 ```
 
-35 tests under plain `gjs -m tests/run.js`: the panel number, the rounding, the unknown
+46 tests under plain `gjs -m tests/run.js`: the panel number, the rounding, the unknown
 state, the expiry rule and each of its five cases, the tie-breaks, the tray's four pulses, a
-damaged document, a schema version from the future, and source-level checks that this
-extension contains no way to open a socket or write a file, that the one program it can
-launch is launched from a click and nowhere else, and that the dead-tray marker is a glyph
-both panel fonts carry. The fixture is nazar-tray's own `fixtures/limits.sample.json`,
-copied as its contract asks consumers to copy it, and every case derives its document from
-that sample rather than committing a second one.
+damaged document, a schema version from the future, every branch of which window `Raise`
+picks out of a process chain, and source-level checks that this extension contains no way to
+open a socket or write a file, that the one program it can launch is launched from a click and
+nowhere else, that the interface declares exactly one method and is exported once and given up
+in `disable()`, and that the dead-tray marker is a glyph both panel fonts carry. The fixture is
+nazar-tray's own `fixtures/limits.sample.json`, copied as its contract asks consumers to copy
+it, and every case derives its document from that sample rather than committing a second one.
 
 The Shell half was driven through its states in a nested GNOME 50 session: the panel
 followed a renamed `limits.json` in **under a second** each time, ten disable/enable cycles
-left exactly one panel button and no JS errors, and `disable()` left nothing behind. The
+left exactly one panel button and no JS errors, and `disable()` left nothing behind — after
+which `Raise` was called over that session's own bus against a real window and answered
+`(true, 'raised …')`, against a pid nobody owns and answered `(false, 'no window owns any of
+1 pids')`, and after a `disable()` was gone from the bus entirely. The
 nested session runs with `GSETTINGS_BACKEND=memory` inside `dbus-run-session`, which matters
 more than it sounds: a nested Shell started without that writes its settings to the **live**
 session's dconf, and the first run of this repository's harness switched off twelve of the

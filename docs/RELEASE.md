@@ -20,7 +20,7 @@ git pull --ff-only
 git status --porcelain          # must print nothing
 
 gh run list --branch main --limit 3      # CI green on the commit you are about to tag
-make check                               # 35 tests, locally, under your own gjs
+make check                               # 46 tests, locally, under your own gjs
 make zip
 ```
 
@@ -46,7 +46,21 @@ stopped, and confirm four things by eye, because all four are things a user sees
   nazar-tray`, and a heartbeat in `~/.nazar/limits.lock` less than a minute old). This is
   the one step a nested session cannot take for you: see the log entry in
   [PROJECT.md](PROJECT.md) for what was measured from outside and what was not;
-- `journalctl --user -f | grep -i nazar` stays quiet while the panel is simply working.
+- `journalctl --user -f | grep -i nazar` stays quiet while the panel is simply working;
+- and the one method this extension exports answers in the **live** session, which the nested
+  one cannot prove because it cannot look at a window. Bring a terminal up, find the pid of
+  something running in it, and ask for it by hand:
+
+  ```sh
+  gdbus call --session --dest org.gnome.Shell \
+    --object-path /org/gnome/Shell/Extensions/Nazar \
+    --method org.gnome.Shell.Extensions.Nazar.Raise "[$$]" ""
+  ```
+
+  It should print `(true, 'raised <class>')` **and the terminal should come to the front** —
+  from behind another window, from a minimised state, and from another workspace, which are
+  the three cases `Main.activateWindow` is there for. Then run it from the Activities overview
+  and confirm the overview closes rather than leaving a focused window behind itself.
 
 And check the two documents a stranger reads before the code: the README's screenshot exists
 and shows the current panel (see [screenshots/README.md](screenshots/README.md)), and
@@ -152,10 +166,11 @@ paragraph of reassurance.
 
 | The rule | Here |
 |---|---|
-| No binaries, no compiled blobs, readable unminified source | Four hand-written files: `extension.js`, `lib/contract.js`, `stylesheet.css`, `assets/bead.svg`. The CI package check fails on anything else. |
+| No binaries, no compiled blobs, readable unminified source | Five hand-written files: `extension.js`, `lib/contract.js`, `lib/raise.js`, `stylesheet.css`, `assets/bead.svg`. The CI package check fails on anything else. |
 | No subprocesses, no privilege elevation | Nothing is elevated and nothing is started on a tick, on a timer or while the panel draws. `tests/run.js` greps the sources for `Gio.Subprocess`, `GLib.spawn`, `spawn_command_line` and thirteen more names, and fails if any appears. One command can be launched — `nazar-tray --view settings`, the tray's own settings page — through an app info and the session's launch context, from the `activate` handler of a menu row a person clicked; a second test counts the launches and the call sites and fails if either grows. |
 | No network | No `Soup`, no `fetch`, no socket; same grep. Everything on screen came out of a file another program wrote. |
-| `disable()` must undo everything `enable()` did | Sources removed, monitor cancelled and disconnected, cancellable cancelled, button destroyed, fields dropped. A test reads both method bodies and fails if `enable()` sets a field `disable()` does not release; a nested session ran ten disable/enable cycles and ended with one panel button and no JS errors. |
+| `disable()` must undo everything `enable()` did | Sources removed, monitor cancelled and disconnected, cancellable cancelled, button destroyed, **the D-Bus object unexported and its reference dropped**, fields dropped. A test reads both method bodies and fails if `enable()` sets a field `disable()` does not release, and counts the export and unexport call sites; a nested session ran ten disable/enable cycles and ended with one panel button, no JS errors, and a path that answered nothing at all while the extension was off. |
+| Nothing exported on the bus beyond what is declared | One method, `org.gnome.Shell.Extensions.Nazar.Raise`, at `/org/gnome/Shell/Extensions/Nazar` — no property and no signal, asserted against the interface XML by a test. It raises a window whose pid the caller already named and can do nothing else: no process started, no file touched, nothing closed, moved or killed, and a pid outside the caller's own list is never matched. |
 | No blocking I/O on the main loop | `load_contents_async` with a `Gio.Cancellable`, never the synchronous call. |
 | No excessive logging | Nothing is logged in the ordinary path. A genuine failure logs one line, and `_warnOnce` will not log the same line twice. |
 | No GTK in `extension.js` | There is no `prefs.js` and no GTK import anywhere; v1 has no preferences. |
