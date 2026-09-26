@@ -98,6 +98,33 @@ test('a percentage is rounded down, never up', () => {
     equal(reading.severity, 'critical');
     equal(floorPercent(99.999), 99);
     equal(floorPercent(null), null);
+    equal(floorPercent(28.9999), 28, 'a real fraction is still not rounded up');
+    equal(floorPercent(99.6), 99);
+    equal(floorPercent(100), 100);
+});
+
+test('float residue does not cost a point of quota', () => {
+    // A writer that computed a percentage as `fraction * 100` reports a true 57 as
+    // 56.99999999999999, because no hundredth is exactly representable in binary. Flooring
+    // that as it stands costs the user a point on precisely the integers — 29, 57, 58 — and
+    // the panel is then quietly wrong about a number it was handed correctly.
+    equal(floorPercent(0.57 * 100), 57);
+    equal(floorPercent(56.99999999999999), 57);
+    equal(floorPercent(14.000000000000002), 14);
+
+    // The same residue through a whole document: the panel's number, and the row it came from.
+    const doc = variant(d => {
+        d.providers.codex.windows.secondary.percent = 56.99999999999999;
+    });
+    const reading = panelReading(doc);
+    equal(reading.percent, 57);
+    equal(reading.provider, 'codex');
+    equal(reading.key, 'secondary');
+
+    const row = providerViews(doc, {now: NOW, timeZone: UTC})
+        .find(v => v.name === 'codex').windows.find(w => w.key === 'secondary');
+    equal(row.percent, 57);
+    equal(row.percentText, '57 %');
 });
 
 test('a window that could not be read is a question mark and never a zero', () => {
