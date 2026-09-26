@@ -9,41 +9,34 @@
  *
  * The only colours are the three accents, and they are Adwaita's own -- the yellow and red
  * GNOME itself uses for warnings and errors in both light and dark, plus its blue for a
- * bar that is merely filling up. A reading is never told apart by colour alone: the number
- * is beside it and the bar is under it.
+ * bar that is merely filling up. A reading is never told apart by colour alone: in the menu,
+ * where the readings are, the number is beside it and the bar is under it.
  *
  * Two class namespaces, never mixed: `nazar-fill-*` paints a bar and `nazar-text-*` paints
  * a number. One list of severity names on two kinds of widget is how a panel button ends
  * up with a blue background.
  */
 
-.nazar-panel {
-  spacing: 4px;
-}
-
+/* The indicator is one child wide, so there is nothing here to space it against: the box
+ * keeps its class because the two states below hang off it. */
 .nazar-icon {
   icon-size: 16px;
 }
 
-.nazar-value {
-  font-feature-settings: "tnum";
-}
-
-/* The tray is not running. The number is real and no longer maintained, so the indicator
- * is dimmed rather than recoloured: recolouring would say something about the quota.
+/* The tray is not running. Nothing up there is recoloured, because a colour would be saying
+ * something about the quota, and the quota is not what changed -- who is watching it did.
  *
  * 0.4, and it started at 0.55. 0.55 is a designer's dim: it reads as deliberate beside a
- * full-strength label and is invisible on its own, which is the only way a panel is ever
+ * full-strength neighbour and is invisible on its own, which is the only way a panel is ever
  * seen -- somebody read a number off a panel dimmed to 0.55 for four days without noticing
- * it was dimmed at all. So it is lower now, and it is no longer the only signal: the value
- * itself grows a marker in extension.js, because opacity is a difference you have to have
- * seen the other state to notice. Much below 0.35 stops being a warning and becomes a
- * legibility bug -- the number still has to be readable, since it is still true. */
+ * it was dimmed at all. Much below 0.35 and the mark stops being a faded mark and becomes an
+ * absent one, which is a different message: the extension is still there and still watching,
+ * it is the engine behind it that stopped. The menu says so in words. */
 .nazar-stale {
   opacity: 0.4;
 }
 
-/* Nothing could be read -- not "nothing has been used". The bead dims with the `?`. */
+/* Nothing could be read -- not "nothing has been used". The menu carries which. */
 .nazar-state-unknown .nazar-icon {
   opacity: 0.55;
 }

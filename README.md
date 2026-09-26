@@ -3,7 +3,7 @@
 Your Claude Code and Codex quota, in the GNOME panel.
 
 ```
- 70%          <- the bead, and the window that binds you
+ ●            <- the bead, and nothing else; the numbers are one click away
 
 Claude                     max_20x · status line · read 1 m ago
   5 hours      ▓▓░░░░░░░░    12 %   resets 06:10 · in 2 h 14 m
@@ -17,10 +17,11 @@ Codex                      plus · rollout log · read 1 m ago
   ⚙ Settings…
 ```
 
-The number in the panel is the **binding** window — the one closest to full, because that
-is the one that stops you. Amber at 60 %, red at 85 %, dimmed and marked `··` when
-nazar-tray is not running, and `?` when a window could not be read or the reading has
-outlived the window it measured — which is never a reassuring `0 %`.
+The panel carries the bead and no number. The numbers are in the menu, where the one that
+matters is the **binding** window — the one closest to full, because that is the one that
+stops you — marked `◂`, amber at 60 % and red at 85 %. A window that could not be read, or
+whose reading has outlived the window it measured, is `?` there and never a reassuring
+`0 %`. The bead itself fades when nazar-tray is not running.
 
 ## Screenshot
 
@@ -173,28 +174,37 @@ statement of that is here rather than nowhere.
 
 ## What the panel says
 
+The panel says the least it can, on purpose. A number in a top bar is read without being
+asked — whatever is up there is taken as current — and every state this face has that is
+not a fresh reading then has to be spelled into those few characters, until one expired
+weekly window turns the whole indicator into a question mark. So the number lives in the
+menu, where the plan, the window, the reset and the tray's own status arrive with it.
+
 | | |
 |---|---|
-| `70%` | The binding window, rounded **down**. 99.6 % is `99%`, because a panel that says a window is spent when it is not is wrong at the moment it matters most. |
-| `?` | Nothing could be read, **or the reading has outlived its window** — see below. Not "nothing has been used": the two are opposite messages to somebody about to start a long task. |
-| amber, red | 60 % and 85 %, the thresholds nazar-tray itself warns at. |
-| `5% ··` | nazar-tray is not running. The number stays while it can still be true — quota does not burn while nothing is using it — and the whole indicator dims to 0.4 **and** grows the two dots. Opacity alone is a difference you have to have seen the other state to notice, and this one went unnoticed for four days. |
+| the bead | Nazar is installed and reading. Click it for the numbers. |
+| a faded bead | nazar-tray is not running. Nothing is maintaining what the menu shows, and the menu's last row says so and how to start it. |
+| a dimmed bead | Nothing could be read at all, or the binding reading has outlived its window — see below. Not "nothing has been used": the two are opposite messages to somebody about to start a long task. |
+
+In the menu: every window both providers report, shortest first, rounded **down** — 99.6 %
+is `99 %`, because saying a window is spent when it is not is wrong at the moment it matters
+most — with `◂` on the window that binds, amber at 60 % and red at 85 %, the thresholds
+nazar-tray itself warns at, and `?` on a window with no reading behind it.
 
 A reading expires with the window it measured. If the binding window's reset has passed and
-nazar-tray is **not** running, there is nothing left to correct the number and the panel
-shows `?` rather than a percentage of a week that is over; the menu row says
+nazar-tray is **not** running, there is nothing left to correct the number and the menu
+shows `?` rather than a percentage of a week that is over; the row says
 `reset was due 02:00 Sat · tray not running`. The same applies the moment the tray marks a
 window `stale`, which is that program saying it itself. While the tray *is* running a reset
 that has just gone by is left alone, because the tray re-reads within the minute and Claude
 Code's five-hour window renews from the first request of a new session rather than on the
 clock.
 
-This is not a small distinction. A panel showing a real number from a dead engine is wrong
-in the reassuring direction, which is the expensive one: 67 % of a weekly window that had
-reset four days earlier reads as "a third left", and the machine was at 5 %.
+This is not a small distinction. A real number from a dead engine is wrong in the
+reassuring direction, which is the expensive one: 67 % of a weekly window that had reset
+four days earlier reads as "a third left", and the machine was at 5 %.
 
-The menu lists every window both providers report, shortest first, with `◂` on the one that
-binds. Window names come from `windowMinutes` rather than from a list of keys, so a window
+Window names come from `windowMinutes` rather than from a list of keys, so a window
 a future nazar-tray adds — Claude's model-scoped weeklies were exactly that — appears
 without a new release of this extension.
 
@@ -210,13 +220,13 @@ a week-old document beside a fresh heartbeat is a quiet week, not a broken tray.
 make check
 ```
 
-46 tests under plain `gjs -m tests/run.js`: the panel number, the rounding, the unknown
+47 tests under plain `gjs -m tests/run.js`: the binding reading, the rounding, the unknown
 state, the expiry rule and each of its five cases, the tie-breaks, the tray's four pulses, a
 damaged document, a schema version from the future, every branch of which window `Raise`
 picks out of a process chain, and source-level checks that this extension contains no way to
 open a socket or write a file, that the one program it can launch is launched from a click and
 nowhere else, that the interface declares exactly one method and is exported once and given up
-in `disable()`, and that the dead-tray marker is a glyph both panel fonts carry. The fixture is
+in `disable()`, and that the indicator is the bead alone with no text in it. The fixture is
 nazar-tray's own `fixtures/limits.sample.json`, copied as its contract asks consumers to copy
 it, and every case derives its document from that sample rather than committing a second one.
 

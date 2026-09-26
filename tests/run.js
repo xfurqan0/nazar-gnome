@@ -724,28 +724,26 @@ test('the one program it ever starts is the tray\'s own settings page', () => {
     ok(source.includes('setSensitive(false)'));
 });
 
-test('the dead-tray marker is text both panel fonts can draw', () => {
-    // A marker that falls through to a fallback font is a marker nobody checked: `⏸` is in
-    // neither Cantarell nor Adwaita Sans and arrives from Noto Color Emoji, and `‖` is in
-    // Adwaita Sans but not in Cantarell, which is what GNOME 46 draws a panel with. The
-    // allowlist below is the set this was verified against with `fc-list :charset=…` in both
-    // faces, and a future edit that reaches for a prettier glyph fails here rather than on
-    // somebody's GNOME 46 panel.
+test('the indicator is the bead and no text', () => {
+    // The panel used to carry the binding percentage, and every state that was not a fresh
+    // reading had to be spelled into it -- a `?` for an expired window, two dots for a dead
+    // engine -- until one stale weekly window turned the whole indicator into a question
+    // mark. The numbers are the menu's now. This test is here so that the next person who
+    // thinks a percentage in the top bar would be handy finds the argument first.
     const source = read(`${ROOT}/extension.js`);
-    const declared = /const NOT_RUNNING_MARKER = '([^']*)';/.exec(source);
-    ok(declared, 'the marker is one constant, not a literal buried in _render');
+    const enable = between(source, '    enable() {', '    disable() {');
+    const render = between(source, '    _render() {', '    _buildMenu() {');
 
-    const marker = declared[1];
-    ok(marker.trim().length > 0, 'a state with no visible difference is not a state');
-    ok(!marker.includes('?'), '`?` means could-not-be-read and may not be borrowed for this');
-    for (const character of marker) {
-        const point = character.codePointAt(0).toString(16).toUpperCase();
-        ok(character === ' ' || character === '·', `U+${point} is not in both panel fonts`);
-    }
+    ok(!/new St\.Label\(/.test(enable), 'nothing in the indicator is a label');
+    equal(occurrences(enable, 'add_child'), 2, 'the bead into the box, the box into the button');
+    ok(!source.includes('NOT_RUNNING_MARKER'), 'no marker, because there is no text to mark');
+    ok(!/\.text\s*=/.test(render), '_render writes no text anywhere');
 
-    // And it is appended rather than substituted: the number is still true and still shown.
-    ok(source.includes('NOT_RUNNING_MARKER'), 'used, not merely declared');
-    ok(/value \+ NOT_RUNNING_MARKER/.test(source), 'the percentage keeps its place in front of it');
+    // What it does still draw, and what it still draws it from: the contract decides whether
+    // there is a reading at all, and the two states the bead can be in follow from that.
+    ok(render.includes('Contract.panelReading('), 'the bead is still drawn from the reading');
+    ok(render.includes('nazar-state-unknown'), 'nothing could be read: the bead dims');
+    ok(render.includes('nazar-stale'), 'the tray is not running: the bead fades');
 });
 
 test('everything enable() creates, disable() releases', () => {

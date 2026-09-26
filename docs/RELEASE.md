@@ -36,11 +36,12 @@ gnome-extensions info nazar-gnome@xfurqan0.github.io     # State: ACTIVE
 Look at it with nazar-tray running as the engine (`nazar-tray --headless`) and again with it
 stopped, and confirm four things by eye, because all four are things a user sees first:
 
-- the bead and a percentage in the panel, and the panel button opens a menu;
-- the number dims **and grows its `··` marker** when the tray is not running, and does not
-  disappear;
-- `?` and not `0%` when `~/.nazar` has nothing to read, and `?` again when the binding
-  window's reset has passed with no tray running — the menu row saying why;
+- the bead in the panel, with no text beside it, and the panel button opens a menu whose
+  rows carry the numbers;
+- the bead fades when the tray is not running, and does not disappear — and the menu's last
+  row says the tray is not running and how to start it;
+- `?` and not `0 %` in the menu when `~/.nazar` has nothing to read, and `?` again when the
+  binding window's reset has passed with no tray running — the row saying why;
 - the gear at the foot of the menu opens nazar-tray's settings page, with the engine
   already running headless, and the engine is still running afterwards (`pgrep -a
   nazar-tray`, and a heartbeat in `~/.nazar/limits.lock` less than a minute old). This is

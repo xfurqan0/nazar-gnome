@@ -35,8 +35,9 @@ in nazar-tray. The rules this extension is built on, in the order they matter:
 6. **A reading expires with the window it measured.** Ours rather than the contract's, and a
    consequence of rule 3: a percentage is a measurement of a window, so when that window is
    over the number is history. Either the tray says so — `state: "stale"` — or the window's
-   `resetsAt` is behind the clock with no tray running to correct it; in both cases the panel
-   shows `?`. A reset that has just passed with the tray **up** is left alone, because it
+   `resetsAt` is behind the clock with no tray running to correct it; in both cases the menu
+   shows `?` and the indicator has no reading behind it. A reset that has just passed with
+   the tray **up** is left alone, because it
    re-reads within the minute and Claude's five-hour window renews from the first request of
    a session rather than on the clock. `panelReading` is the whole of this.
 
@@ -131,9 +132,10 @@ reason it did not think of first.
 | G-WP1 | Drop the "Open Nazar canvas" menu item | No menu row, no loopback URL, no call that leaves the process for one; the source check fails if either name comes back | landed 2026-09-23 |
 | G-WP2 | A gear that opens nazar-tray's settings page | One row at the foot of the menu launching `nazar-tray --view settings` from its `activate` handler; insensitive with a reason when the tray is not on the path; one launch and one call site, both counted by a test | landed 2026-09-23 |
 | G-WP3 | A reading expires with the window it measured | `panelReading` refuses the number when the binding window is `stale`, or its reset has passed with no tray running; a reset that has passed with the tray up is kept; cannot-tell keeps it; the refused row's detail carries the cause | landed 2026-09-23 |
-| G-WP4 | A dead tray that cannot be misread | Panel dims to 0.4 **and** the value carries a marker; the marker's glyphs are in both Cantarell and Adwaita Sans, pinned by a test | landed 2026-09-23 |
+| G-WP4 | A dead tray that cannot be misread | Panel dims to 0.4 **and** the value carries a marker; the marker's glyphs are in both Cantarell and Adwaita Sans, pinned by a test | landed 2026-09-23, the marker half superseded by G-WP7 |
 | G-WP5 | The engine is part of the install | README says the engine must run and how to autostart it, and says why the extension will not do that itself | landed 2026-09-23 |
 | G-WP6 | One D-Bus method, so Nazar can raise a terminal | `org.gnome.Shell.Extensions.Nazar.Raise(au pids, s title_hint) → (b raised, s detail)` at `/org/gnome/Shell/Extensions/Nazar`; the choice of window is pure and in `lib/raise.js`; exported once in `enable()`, unexported in `disable()`, both counted by a test; the interface declares one method and no property or signal; a pid outside the caller's list is never raised; every branch driven over a nested session's own bus | landed 2026-09-23 |
+| G-WP7 | The bead alone in the panel | The indicator carries the bead and no label: no percentage, no `?`, no dead-tray marker, and `_render` writes no text; severity and the numbers are the menu's, the fade at 0.4 stays, and a test fails the day a label comes back | landed 2026-09-26 |
 
 ## Log
 

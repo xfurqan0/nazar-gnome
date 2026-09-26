@@ -22,7 +22,7 @@ Two shots are worth having, and the second is the one that sells it:
 
 | File | What is in it |
 |---|---|
-| `panel.png` | The top bar with the bead and the percentage, cropped to the bar and a little of the workspace under it. What somebody gets for installing this. |
+| `panel.png` | The top bar with the bead, cropped to the bar and a little of the workspace under it. What somebody gets for installing this. |
 | `panel-menu.png` | The same button with the menu open: both providers, every window, the bar, `◂` on the window that binds and the tray's line at the foot. |
 
 ## Before committing one
@@ -44,7 +44,7 @@ what somebody reading without the image gets, so it describes the panel rather t
 the file:
 
 ```markdown
-![The GNOME top bar with the bead and 70% beside the clock, and the menu open underneath:
+![The GNOME top bar with the bead beside the clock, and the menu open underneath:
 Claude's and Codex's windows, each with a percentage, a bar and the time it resets, and a
 mark on the weekly window that binds](docs/screenshots/panel-menu.png)
 ```

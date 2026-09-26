@@ -47,23 +47,21 @@ const TRAY_PROGRAM = 'nazar-tray';
 const TRAY_SETTINGS_COMMAND = `${TRAY_PROGRAM} --view settings`;
 
 /**
- * What is appended to the panel's number while nazar-tray is not running.
+ * The indicator is the bead and nothing else, and that is a decision rather than an omission.
  *
- * Opacity alone was not enough. A dimmed panel is only dim next to the same panel undimmed,
- * and nobody sees both: a number that had been faded for four days was read as current, so
- * the state now changes the text as well as the paint.
+ * It used to carry the binding percentage beside the bead, and the trouble with a number in
+ * a panel is that a panel is read without being asked: whatever is up there is taken as
+ * current, because nobody opens a menu to find out whether what they just read was true.
+ * Every state this face has that is not "a fresh reading" then had to be squeezed into those
+ * few characters — a `?` where the reading had outlived its window, two dots where the engine
+ * was not running — until one stale weekly window turned the whole panel into a question
+ * mark, which tells a passer-by nothing except that something is wrong somewhere.
  *
- * Two middle dots, and the alternatives were measured rather than guessed. `⏸` U+23F8 is the
- * obvious choice and the wrong one — neither Cantarell nor Adwaita Sans carries it, so
- * fontconfig falls through to Noto Color Emoji and the panel gets a colour pictograph of a
- * different size and weight from the number beside it. `‖` U+2016 is in Adwaita Sans, the
- * GNOME 47+ default, but not in Cantarell, which is what GNOME 46 draws a panel with, and a
- * marker that silently changes font on two of the five Shell versions this zip claims is a
- * marker that has to be checked twice. `·` U+00B7 is in both, at the same weight as the
- * digits, and doubled it reads as a pause without being a picture of one. No `?`: the
- * question mark means "could not be read", which is a different state and must stay its own.
+ * So the number went to the menu, where it arrives with the plan, the window, the reset and
+ * the tray's own status around it — everything that makes a number mean something. The panel
+ * keeps only what it can stand behind without a sentence: the mark is up there, and it fades
+ * when nobody is maintaining what is behind it.
  */
-const NOT_RUNNING_MARKER = ' ··';
 
 /** Countdowns and ages move with the clock, so the panel is redrawn on a slow tick. */
 const TICK_SECONDS = 30;
@@ -107,17 +105,11 @@ export default class NazarExtension extends Extension {
             icon_size: 16,
             y_align: Clutter.ActorAlign.CENTER,
         });
-        this._label = new St.Label({
-            text: '?',
-            style_class: 'nazar-value',
-            y_align: Clutter.ActorAlign.CENTER,
-        });
         // Every box in this extension is horizontal, which is not a coincidence: the
         // vertical/orientation property of St.BoxLayout is the one thing that has moved
         // under extensions between GNOME 45 and 51, and a face that never sets it never
         // has to care which spelling this Shell wants.
         this._box.add_child(this._icon);
-        this._box.add_child(this._label);
         this._button.add_child(this._box);
         Main.panel.addToStatusArea(this.uuid, this._button);
 
@@ -216,7 +208,6 @@ export default class NazarExtension extends Extension {
         }
         this._box = null;
         this._icon = null;
-        this._label = null;
         this._doc = null;
         this._error = null;
         this._lockText = null;
@@ -288,23 +279,17 @@ export default class NazarExtension extends Extension {
         const tray = Contract.trayStatus(this._lockText, {now, pidAlive: pid => pidAlive(pid)});
         const reading = Contract.panelReading(this._doc, {now, running: tray.running});
 
-        // Rule 2 in the one place everybody looks: a question mark, never a reassuring 0 %.
-        const value = reading.percent === null ? '?' : `${reading.percent}%`;
-        this._label.text = tray.running ? value : value + NOT_RUNNING_MARKER;
-
-        this._label.style_class = `nazar-value${textClass(reading.severity)}`;
-
-        // The number stays when the tray stops, and only for as long as it can still be
-        // true. Quota does not burn while nothing is using it, so a reading taken before the
-        // engine died is a reading that is still good — right up to the window's own reset,
-        // after which it is a number about a window that no longer exists. Past that point
-        // `panelReading` hands back nothing and the panel shows `?`, because the old number
-        // is not merely stale: it is the wrong answer in the reassuring direction, which is
-        // the worst kind. A panel that sat on 67 % for four days after its weekly reset —
-        // while the true figure was 5 % — is the whole reason that rule is in the contract.
+        // `panelReading` is still what the indicator is drawn from, even with no number on
+        // it: rule 2 and the expiry rule decide whether there is a reading at all, and a
+        // reading that has outlived the window it measured comes back as nothing rather than
+        // as a figure about a week that is over. Here that difference is the bead's own
+        // paint — dimmed for "could not be read" — while the menu says which of the two it
+        // is in words, which is the only place a distinction that fine survives being read.
         //
-        // The dimming below is what says "nobody is maintaining this" without opening the
-        // menu, and it is deliberately not the only signal: see the marker on the value.
+        // The fade below is what says "nobody is maintaining this" without opening the menu.
+        // It is no longer competing with a number that claims otherwise, which is what it was
+        // losing against: a panel that sat on 67 % for four days after its weekly reset —
+        // while the true figure was 5 % — is why the figure is not up there any more.
         const classes = ['nazar-panel'];
         if (reading.severity === 'unknown')
             classes.push('nazar-state-unknown');
